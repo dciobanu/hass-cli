@@ -4,6 +4,13 @@ A command-line utility for controlling Home Assistant.
 
 ## Installation
 
+### Using Homebrew
+
+```bash
+brew tap dciobanu/tap
+brew install hass-cli
+```
+
 ### Building from source
 
 ```bash
@@ -60,6 +67,28 @@ hass-cli entities inspect <entity_id>   # Show full entity state + attributes
 hass-cli areas                          # List all areas with device/entity counts
 hass-cli areas --json                   # Output as JSON
 hass-cli areas inspect <area_id>        # Show area with all devices and entities
+```
+
+### Scenes
+
+```bash
+hass-cli scenes                         # List all scenes
+hass-cli scenes --json                  # Output as JSON
+hass-cli scenes inspect <scene_id>      # Show scene configuration with entities
+
+# Create a scene capturing current entity states
+hass-cli scenes create "Movie Night" -e light.living_room -e light.kitchen
+hass-cli scenes create "Cozy Evening" -e light.bedroom --icon mdi:weather-sunset
+
+# Modify existing scenes
+hass-cli scenes add-entity <scene_id> <entity_id>     # Add entity to scene
+hass-cli scenes remove-entity <scene_id> <entity_id>  # Remove entity from scene
+
+# Delete a scene
+hass-cli scenes delete <scene_id>
+
+# Activate a scene
+hass-cli call scene.turn_on -e scene.movie_night
 ```
 
 ### State
@@ -148,14 +177,6 @@ config/entity_registry/update           - Rename entity, assign area, disable, h
 config/area_registry/create             - Create new area
 config/area_registry/update             - Rename area, assign floor
 config/area_registry/delete             - Delete area
-```
-
-#### Scene Management (Unofficial REST + WebSocket)
-```
-POST /api/config/scene/config/<id>      - Create/update scene
-GET  /api/config/scene/config/<id>      - Get scene configuration
-DELETE /api/config/scene/config/<id>    - Delete scene
-scene.apply (service)                   - Preview scene without saving
 ```
 
 #### Automation Management (Unofficial REST)
