@@ -59,13 +59,90 @@ make clean      # Remove build artifacts
 
 ## Planned Features
 
-- `hass-cli status` - Check API connectivity
-- `hass-cli entities` - List/inspect entities
-- `hass-cli areas` - List/manage areas
-- `hass-cli services` - List/call services
-- `hass-cli state get/set` - Get/set entity states
-- `hass-cli events` - Subscribe to events (WebSocket)
-- `hass-cli watch` - Watch entity state changes
+### Next (High Priority)
+
+```
+hass-cli status                         # Check API connectivity and HA version
+hass-cli entities                       # List all entities
+hass-cli entities -d light              # Filter by domain
+hass-cli entities -a "Living Room"      # Filter by area
+hass-cli entities inspect <entity_id>   # Show full entity state + attributes
+hass-cli areas                          # List all areas
+hass-cli areas inspect <area_id>        # Show area details with devices/entities
+hass-cli state get <entity_id>          # Get current state of entity
+hass-cli state set <entity_id> <state>  # Set entity state
+hass-cli services                       # List available services
+hass-cli services -d light              # Filter by domain
+hass-cli call <domain>.<service>        # Call a service
+hass-cli call light.turn_on -e light.living_room
+hass-cli watch <entity_id>...           # Watch entity state changes (WebSocket)
+```
+
+### Later
+
+API endpoints and features to explore for future development:
+
+#### Device/Entity Management (Unofficial WebSocket API)
+```
+config/device_registry/update           - Rename device, assign area
+config/entity_registry/update           - Rename entity, assign area, disable, hide
+config/area_registry/create             - Create new area
+config/area_registry/update             - Rename area, assign floor
+config/area_registry/delete             - Delete area
+```
+
+#### Scene Management (Unofficial REST + WebSocket)
+```
+POST /api/config/scene/config/<id>      - Create/update scene
+GET  /api/config/scene/config/<id>      - Get scene configuration
+DELETE /api/config/scene/config/<id>    - Delete scene
+scene.apply (service)                   - Preview scene without saving
+```
+
+#### Automation Management (Unofficial REST)
+```
+GET  /api/config/automation/config/<id> - Get automation configuration
+POST /api/config/automation/config/<id> - Create/update automation
+```
+
+#### History & Logging
+```
+GET /api/history/period/<timestamp>     - Entity state history
+GET /api/logbook/<timestamp>            - System event log
+recorder/info (WebSocket)               - Database info
+```
+
+#### Calendar
+```
+GET /api/calendars                      - List calendars
+GET /api/calendars/<id>?start=&end=     - Get calendar events
+```
+
+#### Camera
+```
+GET /api/camera_proxy/<entity_id>       - Download camera snapshot
+```
+
+#### Templates
+```
+POST /api/template                      - Render Jinja2 template
+```
+
+#### Events (WebSocket)
+```
+subscribe_events                        - Subscribe to event bus
+fire_event                              - Fire custom event
+subscribe_trigger                       - Subscribe to automation triggers
+```
+
+#### System
+```
+GET /api/config                         - Full system configuration
+GET /api/error_log                      - Error log (plaintext)
+POST /api/config/core/check_config      - Validate configuration.yaml
+cloud/status (WebSocket)                - Nabu Casa cloud status
+repairs/list_issues (WebSocket)         - System repair issues
+```
 
 ## License
 
