@@ -400,3 +400,98 @@ func (c *Client) CallService(domain, service string, data map[string]interface{}
 
 	return changedStates, nil
 }
+
+// SceneConfig represents a scene configuration.
+type SceneConfig struct {
+	ID       string                            `json:"id"`
+	Name     string                            `json:"name"`
+	Entities map[string]map[string]interface{} `json:"entities"`
+	Icon     string                            `json:"icon,omitempty"`
+}
+
+// GetSceneConfig retrieves the configuration for a specific scene.
+func (c *Client) GetSceneConfig(sceneID string) (*SceneConfig, error) {
+	resp, err := c.doRequest("GET", "/api/config/scene/config/"+sceneID, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode == 404 {
+		return nil, ErrNotFound
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	var config SceneConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &config, nil
+}
+
+// CreateScene creates a new scene.
+func (c *Client) CreateScene(sceneID string, config *SceneConfig) error {
+	resp, err := c.doRequest("POST", "/api/config/scene/config/"+sceneID, config)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
+// UpdateScene updates an existing scene.
+func (c *Client) UpdateScene(sceneID string, config *SceneConfig) error {
+	return c.CreateScene(sceneID, config)
+}
+
+// DeleteScene deletes a scene.
+func (c *Client) DeleteScene(sceneID string) error {
+	resp, err := c.doRequest("DELETE", "/api/config/scene/config/"+sceneID, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode == 404 {
+		return ErrNotFound
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
