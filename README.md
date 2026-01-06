@@ -24,6 +24,13 @@ hass-cli login --url http://ha:8123 --token TOKEN  # Non-interactive
 hass-cli logout                         # Remove saved credentials
 ```
 
+### Status
+
+```bash
+hass-cli status                         # Check API connectivity and HA version
+hass-cli status --json                  # Output as JSON
+```
+
 ### Devices
 
 ```bash
@@ -32,6 +39,79 @@ hass-cli devices -m philips             # Filter by manufacturer
 hass-cli devices -a "Living Room"       # Filter by area
 hass-cli devices --json                 # Output as JSON
 hass-cli devices inspect <id>           # Show full device JSON
+hass-cli devices disable <id>           # Disable a device
+hass-cli devices enable <id>            # Re-enable a disabled device
+hass-cli devices remove <id>            # Remove orphaned device
+```
+
+### Entities
+
+```bash
+hass-cli entities                       # List all entities
+hass-cli entities -d light              # Filter by domain
+hass-cli entities -a kitchen            # Filter by area
+hass-cli entities --json                # Output as JSON
+hass-cli entities inspect <entity_id>   # Show full entity state + attributes
+```
+
+### Areas
+
+```bash
+hass-cli areas                          # List all areas with device/entity counts
+hass-cli areas --json                   # Output as JSON
+hass-cli areas inspect <area_id>        # Show area with all devices and entities
+```
+
+### State
+
+```bash
+hass-cli state get <entity_id>          # Get current state of entity
+hass-cli state get light.living_room --json
+hass-cli state set <entity_id> <state>  # Set entity state directly
+hass-cli state set sensor.custom 42 --attr unit_of_measurement=°C
+```
+
+### Services
+
+```bash
+hass-cli services                       # List all available services
+hass-cli services -d light              # Filter by domain
+hass-cli services inspect light.turn_on # Show service details and fields
+```
+
+### Call Service
+
+```bash
+hass-cli call <domain.service>          # Call a service
+hass-cli call light.turn_on -e light.living_room
+hass-cli call light.turn_off -a living_room        # Target by area
+hass-cli call switch.toggle -e switch.fan
+hass-cli call scene.turn_on -e scene.movie_night
+hass-cli call homeassistant.restart
+
+# Brightness (0-255)
+hass-cli call light.turn_on -a living_room --data '{"brightness": 128}'
+
+# Color (RGB)
+hass-cli call light.turn_on -a living_room --data '{"rgb_color": [255, 0, 0]}'
+
+# Color temperature (Kelvin: 2200=warm, 6500=cool)
+hass-cli call light.turn_on -a living_room --data '{"color_temp_kelvin": 2700}'
+
+# Effects (case-sensitive, check entity attributes for available effects)
+hass-cli call light.turn_on -a living_room --data '{"effect": "Cozy"}'
+
+# Combined
+hass-cli call light.turn_on -a living_room --data '{"rgb_color": [255, 100, 50], "brightness": 200}'
+```
+
+### Watch
+
+```bash
+hass-cli watch                          # Watch all state changes (WebSocket)
+hass-cli watch light.living_room        # Watch specific entity
+hass-cli watch light.* sensor.*         # Watch multiple patterns
+hass-cli watch --json                   # Output as JSON
 ```
 
 ### Global Flags
@@ -57,28 +137,7 @@ make build-all  # Cross-compile for all platforms
 make clean      # Remove build artifacts
 ```
 
-## Planned Features
-
-### Next (High Priority)
-
-```
-hass-cli status                         # Check API connectivity and HA version
-hass-cli entities                       # List all entities
-hass-cli entities -d light              # Filter by domain
-hass-cli entities -a "Living Room"      # Filter by area
-hass-cli entities inspect <entity_id>   # Show full entity state + attributes
-hass-cli areas                          # List all areas
-hass-cli areas inspect <area_id>        # Show area details with devices/entities
-hass-cli state get <entity_id>          # Get current state of entity
-hass-cli state set <entity_id> <state>  # Set entity state
-hass-cli services                       # List available services
-hass-cli services -d light              # Filter by domain
-hass-cli call <domain>.<service>        # Call a service
-hass-cli call light.turn_on -e light.living_room
-hass-cli watch <entity_id>...           # Watch entity state changes (WebSocket)
-```
-
-### Later
+## Later
 
 API endpoints and features to explore for future development:
 

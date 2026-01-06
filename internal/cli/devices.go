@@ -43,6 +43,60 @@ Examples:
 	RunE: runDevicesInspect,
 }
 
+var devicesRemoveCmd = &cobra.Command{
+	Use:   "remove <device_id>",
+	Short: "Remove a device from the registry",
+	Long: `Remove a device from the Home Assistant device registry.
+
+This removes all config entry associations from the device. When a device
+has no more config entries, it is automatically deleted by Home Assistant.
+
+Warning: This may affect the integration that manages this device.
+
+The device ID can be found by running 'hass-cli devices'.
+You can use a partial ID (prefix match) for convenience.
+
+Examples:
+  hass-cli devices remove 4ee3f48beb2fcdeee4f8195b8f1730da
+  hass-cli devices remove 4ee3f48b    # Prefix match`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDevicesRemove,
+}
+
+var devicesDisableCmd = &cobra.Command{
+	Use:   "disable <device_id>",
+	Short: "Disable a device",
+	Long: `Disable a device in Home Assistant.
+
+Disabled devices and their entities will not be available in Home Assistant
+until re-enabled. This is useful for temporarily disabling devices without
+removing them.
+
+The device ID can be found by running 'hass-cli devices'.
+You can use a partial ID (prefix match) for convenience.
+
+Examples:
+  hass-cli devices disable 4ee3f48beb2fcdeee4f8195b8f1730da
+  hass-cli devices disable 4ee3f48b    # Prefix match`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDevicesDisable,
+}
+
+var devicesEnableCmd = &cobra.Command{
+	Use:   "enable <device_id>",
+	Short: "Enable a disabled device",
+	Long: `Enable a previously disabled device in Home Assistant.
+
+The device ID can be found by running 'hass-cli devices'.
+You can use a partial ID (prefix match) for convenience.
+
+Examples:
+  hass-cli devices enable 4ee3f48beb2fcdeee4f8195b8f1730da
+  hass-cli devices enable 4ee3f48b    # Prefix match`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDevicesEnable,
+}
+
 var (
 	deviceManufacturer string
 	deviceArea         string
@@ -51,6 +105,9 @@ var (
 func init() {
 	rootCmd.AddCommand(devicesCmd)
 	devicesCmd.AddCommand(devicesInspectCmd)
+	devicesCmd.AddCommand(devicesRemoveCmd)
+	devicesCmd.AddCommand(devicesDisableCmd)
+	devicesCmd.AddCommand(devicesEnableCmd)
 
 	devicesCmd.Flags().StringVarP(&deviceManufacturer, "manufacturer", "m", "", "Filter by manufacturer (case-insensitive)")
 	devicesCmd.Flags().StringVarP(&deviceArea, "area", "a", "", "Filter by area ID")
@@ -255,6 +312,155 @@ func runDevicesInspect(cmd *cobra.Command, args []string) error {
 
 	// Output the device as formatted JSON
 	return outputJSON(found)
+}
+
+func runDevicesRemove(cmd *cobra.Command, args []string) error {
+	deviceID := args[0]
+
+	// Load configuration
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Create WebSocket client
+	printInfo("Connecting to Home Assistant...")
+	client, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	defer client.Close()
+
+	// Get devices to resolve partial ID and show name
+	printInfo("Fetching devices...")
+	devices, err := client.GetDevices()
+	if err != nil {
+		return fmt.Errorf("failed to get devices: %w", err)
+	}
+
+	// Find device by ID (exact or prefix match)
+	var found *websocket.Device
+	var matches []websocket.Device
+
+	for i := range devices {
+		if devices[i].ID == deviceID {
+			found = &devices[i]
+			break
+		}
+		if strings.HasPrefix(devices[i].ID, deviceID) {
+			matches = append(matches, devices[i])
+		}
+	}
+
+	if found == nil {
+		if len(matches) == 0 {
+			return fmt.Errorf("no device found with ID: %s", deviceID)
+		}
+		if len(matches) > 1 {
+			fmt.Fprintf(os.Stderr, "Multiple devices match '%s':\n", deviceID)
+			for _, d := range matches {
+				fmt.Fprintf(os.Stderr, "  %s  %s\n", d.ID, d.DisplayName())
+			}
+			return fmt.Errorf("please provide a more specific ID")
+		}
+		found = &matches[0]
+	}
+
+	// Check if device has config entries
+	if len(found.ConfigEntries) == 0 {
+		return fmt.Errorf("device has no config entries - it may already be orphaned or managed differently")
+	}
+
+	// Remove all config entries from the device
+	printInfo("Removing device %s (%s)...", found.ID, found.DisplayName())
+	for _, configEntryID := range found.ConfigEntries {
+		printInfo("  Removing config entry %s...", configEntryID)
+		if err := client.RemoveConfigEntryFromDevice(found.ID, configEntryID); err != nil {
+			errStr := err.Error()
+			if strings.Contains(errStr, "does not support device removal") {
+				return fmt.Errorf("integration does not support device removal via API - use the Home Assistant UI or remove the integration")
+			}
+			return fmt.Errorf("failed to remove config entry %s: %w", configEntryID, err)
+		}
+	}
+
+	fmt.Printf("Device removed: %s (%s)\n", found.ID, found.DisplayName())
+	return nil
+}
+
+func runDevicesDisable(cmd *cobra.Command, args []string) error {
+	return setDeviceDisabled(args[0], true)
+}
+
+func runDevicesEnable(cmd *cobra.Command, args []string) error {
+	return setDeviceDisabled(args[0], false)
+}
+
+func setDeviceDisabled(deviceID string, disable bool) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	printInfo("Connecting to Home Assistant...")
+	client, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	defer client.Close()
+
+	printInfo("Fetching devices...")
+	devices, err := client.GetDevices()
+	if err != nil {
+		return fmt.Errorf("failed to get devices: %w", err)
+	}
+
+	// Find device by ID (exact or prefix match)
+	var found *websocket.Device
+	var matches []websocket.Device
+
+	for i := range devices {
+		if devices[i].ID == deviceID {
+			found = &devices[i]
+			break
+		}
+		if strings.HasPrefix(devices[i].ID, deviceID) {
+			matches = append(matches, devices[i])
+		}
+	}
+
+	if found == nil {
+		if len(matches) == 0 {
+			return fmt.Errorf("no device found with ID: %s", deviceID)
+		}
+		if len(matches) > 1 {
+			fmt.Fprintf(os.Stderr, "Multiple devices match '%s':\n", deviceID)
+			for _, d := range matches {
+				fmt.Fprintf(os.Stderr, "  %s  %s\n", d.ID, d.DisplayName())
+			}
+			return fmt.Errorf("please provide a more specific ID")
+		}
+		found = &matches[0]
+	}
+
+	var device *websocket.Device
+	if disable {
+		printInfo("Disabling device %s (%s)...", found.ID, found.DisplayName())
+		device, err = client.DisableDevice(found.ID)
+		if err != nil {
+			return fmt.Errorf("failed to disable device: %w", err)
+		}
+		fmt.Printf("Device disabled: %s (%s)\n", device.ID, device.DisplayName())
+	} else {
+		printInfo("Enabling device %s (%s)...", found.ID, found.DisplayName())
+		device, err = client.EnableDevice(found.ID)
+		if err != nil {
+			return fmt.Errorf("failed to enable device: %w", err)
+		}
+		fmt.Printf("Device enabled: %s (%s)\n", device.ID, device.DisplayName())
+	}
+
+	return nil
 }
 
 // loadConfig loads the configuration, respecting command-line overrides.

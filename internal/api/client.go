@@ -111,3 +111,292 @@ func (c *Client) GetStatus() (*APIStatus, error) {
 
 	return &status, nil
 }
+
+// Config represents the Home Assistant configuration.
+type Config struct {
+	Components           []string   `json:"components"`
+	ConfigDir            string     `json:"config_dir"`
+	Elevation            float64    `json:"elevation"`
+	Latitude             float64    `json:"latitude"`
+	Longitude            float64    `json:"longitude"`
+	LocationName         string     `json:"location_name"`
+	TimeZone             string     `json:"time_zone"`
+	UnitSystem           UnitSystem `json:"unit_system"`
+	Version              string     `json:"version"`
+	WhitelistExternalDir []string   `json:"whitelist_external_dirs"`
+	State                string     `json:"state"`
+	Currency             string     `json:"currency"`
+	Country              string     `json:"country"`
+	Language             string     `json:"language"`
+}
+
+// UnitSystem represents the unit system configuration.
+type UnitSystem struct {
+	Length      string `json:"length"`
+	Mass        string `json:"mass"`
+	Temperature string `json:"temperature"`
+	Volume      string `json:"volume"`
+}
+
+// GetConfig returns the Home Assistant configuration.
+func (c *Client) GetConfig() (*Config, error) {
+	resp, err := c.doRequest("GET", "/api/config", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	var config Config
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &config, nil
+}
+
+// State represents an entity state.
+type State struct {
+	EntityID    string                 `json:"entity_id"`
+	State       string                 `json:"state"`
+	Attributes  map[string]interface{} `json:"attributes"`
+	LastChanged string                 `json:"last_changed"`
+	LastUpdated string                 `json:"last_updated"`
+	Context     StateContext           `json:"context"`
+}
+
+// StateContext represents the context of a state change.
+type StateContext struct {
+	ID       string  `json:"id"`
+	ParentID *string `json:"parent_id"`
+	UserID   *string `json:"user_id"`
+}
+
+// GetStates returns all entity states.
+func (c *Client) GetStates() ([]State, error) {
+	resp, err := c.doRequest("GET", "/api/states", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	var states []State
+	if err := json.NewDecoder(resp.Body).Decode(&states); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return states, nil
+}
+
+// GetState returns the state of a specific entity.
+func (c *Client) GetState(entityID string) (*State, error) {
+	resp, err := c.doRequest("GET", "/api/states/"+entityID, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode == 404 {
+		return nil, ErrNotFound
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	var state State
+	if err := json.NewDecoder(resp.Body).Decode(&state); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &state, nil
+}
+
+// SetState sets the state of an entity.
+func (c *Client) SetState(entityID string, state string, attributes map[string]interface{}) (*State, error) {
+	body := map[string]interface{}{
+		"state": state,
+	}
+	if attributes != nil {
+		body["attributes"] = attributes
+	}
+
+	resp, err := c.doRequest("POST", "/api/states/"+entityID, body)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(respBody),
+		}
+	}
+
+	var resultState State
+	if err := json.NewDecoder(resp.Body).Decode(&resultState); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &resultState, nil
+}
+
+// Service represents a service domain with its services.
+type Service struct {
+	Domain   string                 `json:"domain"`
+	Services map[string]ServiceInfo `json:"services"`
+}
+
+// ServiceInfo represents information about a service.
+type ServiceInfo struct {
+	Name        string                    `json:"name"`
+	Description string                    `json:"description"`
+	Fields      map[string]ServiceField   `json:"fields"`
+	Target      *ServiceTarget            `json:"target"`
+	Response    *ServiceResponseInfo      `json:"response,omitempty"`
+}
+
+// ServiceField represents a field in a service.
+type ServiceField struct {
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Required    bool        `json:"required"`
+	Example     interface{} `json:"example"`
+	Selector    interface{} `json:"selector"`
+}
+
+// ServiceTarget represents the target configuration for a service.
+type ServiceTarget struct {
+	Entity []TargetEntity `json:"entity,omitempty"`
+	Device []TargetDevice `json:"device,omitempty"`
+	Area   []TargetArea   `json:"area,omitempty"`
+}
+
+// TargetEntity represents entity targeting info.
+type TargetEntity struct {
+	Domain string `json:"domain,omitempty"`
+}
+
+// TargetDevice represents device targeting info.
+type TargetDevice struct {
+	Integration string `json:"integration,omitempty"`
+}
+
+// TargetArea represents area targeting info.
+type TargetArea struct{}
+
+// ServiceResponseInfo represents response info for a service.
+type ServiceResponseInfo struct {
+	Optional bool `json:"optional"`
+}
+
+// GetServices returns all available services.
+func (c *Client) GetServices() (map[string]map[string]ServiceInfo, error) {
+	resp, err := c.doRequest("GET", "/api/services", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	// API returns array of {domain, services} objects
+	var services []struct {
+		Domain   string                     `json:"domain"`
+		Services map[string]ServiceInfo     `json:"services"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&services); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Convert to map
+	result := make(map[string]map[string]ServiceInfo)
+	for _, s := range services {
+		result[s.Domain] = s.Services
+	}
+
+	return result, nil
+}
+
+// CallService calls a service.
+func (c *Client) CallService(domain, service string, data map[string]interface{}) ([]State, error) {
+	resp, err := c.doRequest("POST", "/api/services/"+domain+"/"+service, data)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode == 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	var changedStates []State
+	if err := json.NewDecoder(resp.Body).Decode(&changedStates); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return changedStates, nil
+}

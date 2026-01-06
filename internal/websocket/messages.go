@@ -132,7 +132,7 @@ type Entity struct {
 	ID             string            `json:"id"`
 	Labels         []string          `json:"labels"`
 	Name           *string           `json:"name"`
-	OriginalName   *string           `json:"original_name"`
+	OriginalName   interface{}       `json:"original_name"` // Can be string or null
 	Platform       string            `json:"platform"`
 	CreatedAt      float64           `json:"created_at"`
 	ModifiedAt     float64           `json:"modified_at"`
@@ -143,8 +143,56 @@ func (e *Entity) DisplayName() string {
 	if e.Name != nil && *e.Name != "" {
 		return *e.Name
 	}
-	if e.OriginalName != nil && *e.OriginalName != "" {
-		return *e.OriginalName
+	if origName, ok := e.OriginalName.(string); ok && origName != "" {
+		return origName
 	}
 	return e.EntityID
+}
+
+// GetOriginalName returns the original name as a string pointer.
+func (e *Entity) GetOriginalName() *string {
+	if origName, ok := e.OriginalName.(string); ok {
+		return &origName
+	}
+	return nil
+}
+
+// EventMessage represents an event message from a subscription.
+type EventMessage struct {
+	ID    int        `json:"id"`
+	Type  string     `json:"type"`
+	Event EventData  `json:"event"`
+}
+
+// EventData contains the event payload.
+type EventData struct {
+	EventType  string                 `json:"event_type"`
+	Data       StateChangedData       `json:"data"`
+	Origin     string                 `json:"origin"`
+	TimeFired  string                 `json:"time_fired"`
+	Context    EventContext           `json:"context"`
+}
+
+// StateChangedData contains state change information.
+type StateChangedData struct {
+	EntityID string       `json:"entity_id"`
+	OldState *StateObject `json:"old_state"`
+	NewState *StateObject `json:"new_state"`
+}
+
+// StateObject represents an entity state.
+type StateObject struct {
+	EntityID    string                 `json:"entity_id"`
+	State       string                 `json:"state"`
+	Attributes  map[string]interface{} `json:"attributes"`
+	LastChanged string                 `json:"last_changed"`
+	LastUpdated string                 `json:"last_updated"`
+	Context     EventContext           `json:"context"`
+}
+
+// EventContext contains context information about an event.
+type EventContext struct {
+	ID       string  `json:"id"`
+	ParentID *string `json:"parent_id"`
+	UserID   *string `json:"user_id"`
 }

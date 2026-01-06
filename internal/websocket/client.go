@@ -226,3 +226,124 @@ func (c *Client) GetEntities() ([]Entity, error) {
 
 	return entities, nil
 }
+
+// SubscribeEvents subscribes to events and returns the subscription ID.
+// eventType can be empty to subscribe to all events, or a specific type like "state_changed".
+func (c *Client) SubscribeEvents(eventType string) (int, error) {
+	id := c.nextID()
+
+	msg := map[string]interface{}{
+		"id":   id,
+		"type": "subscribe_events",
+	}
+	if eventType != "" {
+		msg["event_type"] = eventType
+	}
+
+	c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
+	if err := c.conn.WriteJSON(msg); err != nil {
+		return 0, fmt.Errorf("failed to subscribe: %w", err)
+	}
+
+	// Wait for result
+	c.conn.SetReadDeadline(time.Now().Add(c.timeout))
+	for {
+		_, data, err := c.conn.ReadMessage()
+		if err != nil {
+			return 0, fmt.Errorf("failed to read subscription response: %w", err)
+		}
+
+		var result ResultMessage
+		if err := json.Unmarshal(data, &result); err != nil {
+			continue
+		}
+
+		if result.ID == id && result.Type == "result" {
+			if !result.Success {
+				if result.Error != nil {
+					return 0, fmt.Errorf("%s: %s", result.Error.Code, result.Error.Message)
+				}
+				return 0, fmt.Errorf("subscription failed")
+			}
+			return id, nil
+		}
+	}
+}
+
+// ReadEvent reads the next event from the WebSocket.
+// This blocks until an event is received or context is cancelled.
+func (c *Client) ReadEvent() (*EventMessage, error) {
+	// Clear deadline for long-running reads
+	c.conn.SetReadDeadline(time.Time{})
+
+	for {
+		_, data, err := c.conn.ReadMessage()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read event: %w", err)
+		}
+
+		var msg EventMessage
+		if err := json.Unmarshal(data, &msg); err != nil {
+			continue // Skip messages we can't parse
+		}
+
+		if msg.Type == "event" {
+			return &msg, nil
+		}
+	}
+}
+
+// GetStates retrieves all current states via WebSocket.
+func (c *Client) GetStates() ([]StateObject, error) {
+	result, err := c.SendCommand("get_states", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var states []StateObject
+	if err := json.Unmarshal(result.Result, &states); err != nil {
+		return nil, fmt.Errorf("failed to parse states: %w", err)
+	}
+
+	return states, nil
+}
+
+// RemoveConfigEntryFromDevice removes a config entry from a device.
+// When all config entries are removed, the device is automatically deleted.
+func (c *Client) RemoveConfigEntryFromDevice(deviceID, configEntryID string) error {
+	_, err := c.SendCommand("config/device_registry/remove_config_entry", map[string]interface{}{
+		"device_id":       deviceID,
+		"config_entry_id": configEntryID,
+	})
+	return err
+}
+
+// UpdateDevice updates a device in the device registry.
+func (c *Client) UpdateDevice(deviceID string, updates map[string]interface{}) (*Device, error) {
+	updates["device_id"] = deviceID
+	result, err := c.SendCommand("config/device_registry/update", updates)
+	if err != nil {
+		return nil, err
+	}
+
+	var device Device
+	if err := json.Unmarshal(result.Result, &device); err != nil {
+		return nil, fmt.Errorf("failed to parse device: %w", err)
+	}
+
+	return &device, nil
+}
+
+// DisableDevice disables a device.
+func (c *Client) DisableDevice(deviceID string) (*Device, error) {
+	return c.UpdateDevice(deviceID, map[string]interface{}{
+		"disabled_by": "user",
+	})
+}
+
+// EnableDevice enables a previously disabled device.
+func (c *Client) EnableDevice(deviceID string) (*Device, error) {
+	return c.UpdateDevice(deviceID, map[string]interface{}{
+		"disabled_by": nil,
+	})
+}
