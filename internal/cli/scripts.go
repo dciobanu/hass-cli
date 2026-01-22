@@ -526,11 +526,6 @@ func outputTracesTable(traces []websocket.TraceSummary) error {
 	fmt.Fprintln(w, "------\t-----\t------\t-------\t--------")
 
 	for _, t := range traces {
-		runID := t.RunID
-		if len(runID) > 16 {
-			runID = runID[:16] + "..."
-		}
-
 		started := t.Timestamp.Start
 		if s, err := time.Parse(time.RFC3339, t.Timestamp.Start); err == nil {
 			started = s.Local().Format("2006-01-02 15:04:05")
@@ -551,7 +546,7 @@ func outputTracesTable(traces []websocket.TraceSummary) error {
 		}
 
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			runID,
+			t.RunID,
 			t.State,
 			t.ScriptExecution,
 			started,
