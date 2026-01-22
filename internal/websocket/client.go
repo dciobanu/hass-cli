@@ -347,3 +347,88 @@ func (c *Client) EnableDevice(deviceID string) (*Device, error) {
 		"disabled_by": nil,
 	})
 }
+
+// TraceSummary represents a summary of a script/automation trace.
+type TraceSummary struct {
+	LastStep        string         `json:"last_step"`
+	RunID           string         `json:"run_id"`
+	State           string         `json:"state"`
+	ScriptExecution string         `json:"script_execution"`
+	Timestamp       TraceTimestamp `json:"timestamp"`
+	Domain          string         `json:"domain"`
+	ItemID          string         `json:"item_id"`
+}
+
+// TraceTimestamp represents timing information for a trace.
+type TraceTimestamp struct {
+	Start  string `json:"start"`
+	Finish string `json:"finish"`
+}
+
+// TraceDetail represents detailed trace information.
+type TraceDetail struct {
+	LastStep        string                   `json:"last_step"`
+	RunID           string                   `json:"run_id"`
+	State           string                   `json:"state"`
+	ScriptExecution string                   `json:"script_execution"`
+	Timestamp       TraceTimestamp           `json:"timestamp"`
+	Domain          string                   `json:"domain"`
+	ItemID          string                   `json:"item_id"`
+	Trace           map[string][]TraceStep   `json:"trace"`
+	Config          map[string]interface{}   `json:"config"`
+	BlueprintInputs map[string]interface{}   `json:"blueprint_inputs,omitempty"`
+	Context         TraceContext             `json:"context"`
+}
+
+// TraceStep represents a single step in a trace.
+type TraceStep struct {
+	Path             string                 `json:"path"`
+	Timestamp        string                 `json:"timestamp"`
+	ChangedVariables map[string]interface{} `json:"changed_variables,omitempty"`
+	Result           map[string]interface{} `json:"result,omitempty"`
+	Error            string                 `json:"error,omitempty"`
+}
+
+// TraceContext represents the context of a trace execution.
+type TraceContext struct {
+	ID       string  `json:"id"`
+	ParentID *string `json:"parent_id"`
+	UserID   *string `json:"user_id"`
+}
+
+// ListTraces retrieves all traces for a script or automation.
+func (c *Client) ListTraces(domain, itemID string) ([]TraceSummary, error) {
+	result, err := c.SendCommand("trace/list", map[string]interface{}{
+		"domain":  domain,
+		"item_id": itemID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var traces []TraceSummary
+	if err := json.Unmarshal(result.Result, &traces); err != nil {
+		return nil, fmt.Errorf("failed to parse traces: %w", err)
+	}
+
+	return traces, nil
+}
+
+// GetTrace retrieves detailed trace information for a specific run.
+func (c *Client) GetTrace(domain, itemID, runID string) (*TraceDetail, error) {
+	result, err := c.SendCommand("trace/get", map[string]interface{}{
+		"domain":  domain,
+		"item_id": itemID,
+		"run_id":  runID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var trace TraceDetail
+	if err := json.Unmarshal(result.Result, &trace); err != nil {
+		return nil, fmt.Errorf("failed to parse trace: %w", err)
+	}
+
+	return &trace, nil
+}

@@ -495,3 +495,103 @@ func (c *Client) DeleteScene(sceneID string) error {
 
 	return nil
 }
+
+// ScriptConfig represents a script configuration.
+type ScriptConfig struct {
+	Alias       string                   `json:"alias"`
+	Description string                   `json:"description,omitempty"`
+	Icon        string                   `json:"icon,omitempty"`
+	Mode        string                   `json:"mode,omitempty"`
+	Sequence    []map[string]interface{} `json:"sequence"`
+	Fields      map[string]interface{}   `json:"fields,omitempty"`
+	Variables   map[string]interface{}   `json:"variables,omitempty"`
+	MaxExceeded string                   `json:"max_exceeded,omitempty"`
+	Max         int                      `json:"max,omitempty"`
+}
+
+// GetScriptConfig retrieves the configuration for a specific script.
+func (c *Client) GetScriptConfig(scriptID string) (*ScriptConfig, error) {
+	resp, err := c.doRequest("GET", "/api/config/script/config/"+scriptID, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode == 404 {
+		return nil, ErrNotFound
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	var config ScriptConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &config, nil
+}
+
+// CreateScript creates a new script.
+func (c *Client) CreateScript(scriptID string, config *ScriptConfig) error {
+	resp, err := c.doRequest("POST", "/api/config/script/config/"+scriptID, config)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
+// UpdateScript updates an existing script.
+func (c *Client) UpdateScript(scriptID string, config *ScriptConfig) error {
+	return c.CreateScript(scriptID, config)
+}
+
+// DeleteScript deletes a script.
+func (c *Client) DeleteScript(scriptID string) error {
+	resp, err := c.doRequest("DELETE", "/api/config/script/config/"+scriptID, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode == 404 {
+		return ErrNotFound
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}

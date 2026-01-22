@@ -24,6 +24,7 @@ Examples:
   hass-cli entities              # List all entities
   hass-cli entities -d light     # Filter by domain
   hass-cli entities -a kitchen   # Filter by area
+  hass-cli entities -D <device>  # Filter by device ID (prefix match)
   hass-cli entities --json       # Output as JSON`,
 	RunE: runEntities,
 }
@@ -43,6 +44,7 @@ Examples:
 var (
 	entityDomain string
 	entityArea   string
+	entityDevice string
 )
 
 func init() {
@@ -51,6 +53,7 @@ func init() {
 
 	entitiesCmd.Flags().StringVarP(&entityDomain, "domain", "d", "", "Filter by domain (e.g., light, switch, sensor)")
 	entitiesCmd.Flags().StringVarP(&entityArea, "area", "a", "", "Filter by area name")
+	entitiesCmd.Flags().StringVarP(&entityDevice, "device", "D", "", "Filter by device ID (prefix match supported)")
 }
 
 // EntityWithState combines entity registry info with current state.
@@ -174,6 +177,16 @@ func runEntities(cmd *cobra.Command, args []string) error {
 				continue
 			}
 			if !strings.Contains(strings.ToLower(areaName), strings.ToLower(entityArea)) {
+				continue
+			}
+		}
+
+		if entityDevice != "" {
+			if entity.DeviceID == nil {
+				continue
+			}
+			// Support prefix match
+			if *entity.DeviceID != entityDevice && !strings.HasPrefix(*entity.DeviceID, entityDevice) {
 				continue
 			}
 		}

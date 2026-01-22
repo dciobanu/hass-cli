@@ -57,6 +57,7 @@ hass-cli devices remove <id>            # Remove orphaned device
 hass-cli entities                       # List all entities
 hass-cli entities -d light              # Filter by domain
 hass-cli entities -a kitchen            # Filter by area
+hass-cli entities -D <device_id>        # Filter by device (prefix match)
 hass-cli entities --json                # Output as JSON
 hass-cli entities inspect <entity_id>   # Show full entity state + attributes
 ```
@@ -89,6 +90,42 @@ hass-cli scenes delete <scene_id>
 
 # Activate a scene
 hass-cli call scene.turn_on -e scene.movie_night
+```
+
+### Scripts
+
+```bash
+hass-cli scripts                        # List all scripts
+hass-cli scripts --json                 # Output as JSON
+hass-cli scripts inspect <script_id>    # Show script configuration
+
+# Run/trigger a script
+hass-cli scripts run hello_world
+hass-cli scripts trigger my_script      # 'trigger' is an alias for 'run'
+hass-cli scripts run my_script --data '{"brightness": 128}'  # Pass variables
+
+# Create a new script
+hass-cli scripts create "Hello World" --description "A test script"
+hass-cli scripts create "Turn Off Lights" \
+  --icon mdi:lightbulb-off \
+  --mode single \
+  --sequence '[{"service":"light.turn_off","target":{"area_id":"living_room"}}]'
+
+# Edit an existing script
+hass-cli scripts edit hello_world --alias "Hello World Updated"
+hass-cli scripts edit hello_world --description "Updated description"
+hass-cli scripts edit hello_world --sequence '[{"service":"light.turn_on"}]'
+
+# Rename a script
+hass-cli scripts rename hello_world "Greeting Script"
+
+# Debug a script (view execution traces)
+hass-cli scripts debug hello_world                    # List all traces
+hass-cli scripts debug hello_world --run-id <id>      # Show detailed trace
+hass-cli scripts debug hello_world --json             # Output as JSON
+
+# Delete a script
+hass-cli scripts delete hello_world
 ```
 
 ### State
