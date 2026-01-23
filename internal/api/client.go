@@ -595,3 +595,101 @@ func (c *Client) DeleteScript(scriptID string) error {
 
 	return nil
 }
+
+// AutomationConfig represents an automation configuration.
+type AutomationConfig struct {
+	ID          string                   `json:"id,omitempty"`
+	Alias       string                   `json:"alias"`
+	Description string                   `json:"description,omitempty"`
+	Triggers    []map[string]interface{} `json:"triggers,omitempty"`
+	Conditions  []map[string]interface{} `json:"conditions,omitempty"`
+	Actions     []map[string]interface{} `json:"actions,omitempty"`
+	Mode        string                   `json:"mode,omitempty"`
+}
+
+// GetAutomationConfig retrieves the configuration for a specific automation.
+func (c *Client) GetAutomationConfig(automationID string) (*AutomationConfig, error) {
+	resp, err := c.doRequest("GET", "/api/config/automation/config/"+automationID, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+
+	if resp.StatusCode == 404 {
+		return nil, ErrNotFound
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	var config AutomationConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &config, nil
+}
+
+// CreateAutomation creates a new automation.
+func (c *Client) CreateAutomation(automationID string, config *AutomationConfig) error {
+	resp, err := c.doRequest("POST", "/api/config/automation/config/"+automationID, config)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
+// UpdateAutomation updates an existing automation.
+func (c *Client) UpdateAutomation(automationID string, config *AutomationConfig) error {
+	return c.CreateAutomation(automationID, config)
+}
+
+// DeleteAutomation deletes an automation.
+func (c *Client) DeleteAutomation(automationID string) error {
+	resp, err := c.doRequest("DELETE", "/api/config/automation/config/"+automationID, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode == 404 {
+		return ErrNotFound
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}

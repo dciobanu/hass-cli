@@ -128,6 +128,47 @@ hass-cli scripts debug hello_world --json             # Output as JSON
 hass-cli scripts delete hello_world
 ```
 
+### Automations
+
+```bash
+hass-cli automations                        # List all automations
+hass-cli automations --json                 # Output as JSON
+hass-cli automations inspect <id>           # Show automation configuration
+
+# Trigger an automation manually
+hass-cli automations trigger 1761025981191
+hass-cli automations trigger automation.motion_light
+hass-cli automations run motion_light       # 'run' is an alias for 'trigger'
+
+# Enable/disable automations
+hass-cli automations enable motion_light
+hass-cli automations disable motion_light
+
+# Create a new automation
+hass-cli automations create "Motion Light" --description "Turn on light when motion detected"
+hass-cli automations create "Sunrise Routine" \
+  --mode single \
+  --triggers '[{"trigger":"sun","event":"sunrise"}]' \
+  --actions '[{"action":"light.turn_on","target":{"area_id":"bedroom"}}]'
+
+# Edit an existing automation
+hass-cli automations edit 1761025981191 --alias "Updated Name"
+hass-cli automations edit 1761025981191 --description "New description"
+hass-cli automations edit 1761025981191 --mode restart
+hass-cli automations edit 1761025981191 --actions '[{"action":"light.turn_off"}]'
+
+# Rename an automation
+hass-cli automations rename 1761025981191 "New Automation Name"
+
+# Debug an automation (view execution traces)
+hass-cli automations debug 1761025981191                    # List all traces
+hass-cli automations debug 1761025981191 --run-id <id>      # Show detailed trace
+hass-cli automations debug 1761025981191 --json             # Output as JSON
+
+# Delete an automation
+hass-cli automations delete 1761025981191
+```
+
 ### State
 
 ```bash
@@ -214,12 +255,6 @@ config/entity_registry/update           - Rename entity, assign area, disable, h
 config/area_registry/create             - Create new area
 config/area_registry/update             - Rename area, assign floor
 config/area_registry/delete             - Delete area
-```
-
-#### Automation Management (Unofficial REST)
-```
-GET  /api/config/automation/config/<id> - Get automation configuration
-POST /api/config/automation/config/<id> - Create/update automation
 ```
 
 #### History & Logging
