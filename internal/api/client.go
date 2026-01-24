@@ -733,6 +733,44 @@ func (c *Client) CreateInputSelect(objectID, name string, options []string, icon
 	return nil
 }
 
+// CreateInputBoolean creates a new input_boolean helper.
+func (c *Client) CreateInputBoolean(objectID, name string, icon string) error {
+	config := map[string]interface{}{
+		"name": name,
+	}
+	if icon != "" {
+		config["icon"] = icon
+	}
+
+	resp, err := c.doRequest("POST", "/api/config/input_boolean/config/"+objectID, config)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode == 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
 // CallInputSelectSetOptions updates the options of an input_select via service call.
 func (c *Client) CallInputSelectSetOptions(entityID string, options []string) error {
 	data := map[string]interface{}{

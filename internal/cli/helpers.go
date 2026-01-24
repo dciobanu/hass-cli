@@ -19,15 +19,19 @@ var helpersCmd = &cobra.Command{
 	Short: "List and manage helpers",
 	Long: `List and manage Home Assistant helpers (input entities).
 
-Helpers are user-configurable entities like dropdowns, toggles, numbers, and text inputs.
-Currently supports input_select (dropdown) helpers.
+Helpers are user-configurable entities like dropdowns, toggles, buttons, numbers, and text inputs.
+Supports all helper types: input_select, input_boolean, input_button, input_number, input_text.
 
 Examples:
-  hass-cli helpers                        # List all helpers
-  hass-cli helpers --json                 # Output as JSON
-  hass-cli helpers inspect <helper_id>    # Show helper configuration
-  hass-cli helpers create-select <name>   # Create a dropdown helper
-  hass-cli helpers delete <helper_id>     # Delete a helper`,
+  hass-cli helpers                          # List all helpers
+  hass-cli helpers --json                   # Output as JSON
+  hass-cli helpers inspect <helper_id>      # Show helper configuration
+  hass-cli helpers create-select <name>     # Create a dropdown helper
+  hass-cli helpers create-boolean <name>    # Create a toggle helper
+  hass-cli helpers create-button <name>     # Create a button helper
+  hass-cli helpers create-number <name>     # Create a number helper
+  hass-cli helpers create-text <name>       # Create a text input helper
+  hass-cli helpers delete <helper_id>       # Delete a helper`,
 	RunE: runHelpers,
 }
 
@@ -57,6 +61,57 @@ Examples:
   hass-cli helpers create-select "Room Scene" --options '["off","bright","dim"]' --icon mdi:lightbulb`,
 	Args: cobra.ExactArgs(1),
 	RunE: runHelpersCreateSelect,
+}
+
+var helpersCreateBooleanCmd = &cobra.Command{
+	Use:   "create-boolean <name>",
+	Short: "Create a new toggle (input_boolean) helper",
+	Long: `Create a new input_boolean helper with the specified name.
+
+Examples:
+  hass-cli helpers create-boolean "Scene Active"
+  hass-cli helpers create-boolean "Night Mode" --icon mdi:weather-night`,
+	Args: cobra.ExactArgs(1),
+	RunE: runHelpersCreateBoolean,
+}
+
+var helpersCreateButtonCmd = &cobra.Command{
+	Use:   "create-button <name>",
+	Short: "Create a new button (input_button) helper",
+	Long: `Create a new input_button helper with the specified name.
+
+Buttons can be pressed to trigger automations.
+
+Examples:
+  hass-cli helpers create-button "Doorbell"
+  hass-cli helpers create-button "Panic Button" --icon mdi:alarm-light`,
+	Args: cobra.ExactArgs(1),
+	RunE: runHelpersCreateButton,
+}
+
+var helpersCreateNumberCmd = &cobra.Command{
+	Use:   "create-number <name>",
+	Short: "Create a new number (input_number) helper",
+	Long: `Create a new input_number helper with the specified name.
+
+Examples:
+  hass-cli helpers create-number "Volume Level" --min 0 --max 100 --step 1
+  hass-cli helpers create-number "Temperature Setpoint" --min 15 --max 30 --step 0.5 --mode box --icon mdi:thermometer`,
+	Args: cobra.ExactArgs(1),
+	RunE: runHelpersCreateNumber,
+}
+
+var helpersCreateTextCmd = &cobra.Command{
+	Use:   "create-text <name>",
+	Short: "Create a new text (input_text) helper",
+	Long: `Create a new input_text helper with the specified name.
+
+Examples:
+  hass-cli helpers create-text "User Name" --min 0 --max 100
+  hass-cli helpers create-text "Password" --mode password --max 50
+  hass-cli helpers create-text "Email" --pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"`,
+	Args: cobra.ExactArgs(1),
+	RunE: runHelpersCreateText,
 }
 
 var helpersEditSelectCmd = &cobra.Command{
@@ -124,6 +179,15 @@ var (
 	helperIcon        string
 	helperRenameName  string
 	helperNewEntityID string
+	helperMin         float64
+	helperMax         float64
+	helperStep        float64
+	helperMode        string
+	helperPattern     string
+	helperInitial     float64
+	helperHasInitial  bool
+	helperTextMin     int
+	helperTextMax     int
 )
 
 func init() {
@@ -131,6 +195,10 @@ func init() {
 
 	helpersCmd.AddCommand(helpersInspectCmd)
 	helpersCmd.AddCommand(helpersCreateSelectCmd)
+	helpersCmd.AddCommand(helpersCreateBooleanCmd)
+	helpersCmd.AddCommand(helpersCreateButtonCmd)
+	helpersCmd.AddCommand(helpersCreateNumberCmd)
+	helpersCmd.AddCommand(helpersCreateTextCmd)
 	helpersCmd.AddCommand(helpersEditSelectCmd)
 	helpersCmd.AddCommand(helpersRenameCmd)
 	helpersCmd.AddCommand(helpersDeleteCmd)
@@ -140,6 +208,24 @@ func init() {
 	helpersCreateSelectCmd.Flags().StringVar(&helperOptions, "options", "", "JSON array of options (required)")
 	helpersCreateSelectCmd.Flags().StringVar(&helperIcon, "icon", "", "Icon (e.g., mdi:lightbulb)")
 	helpersCreateSelectCmd.MarkFlagRequired("options")
+
+	helpersCreateBooleanCmd.Flags().StringVar(&helperIcon, "icon", "", "Icon (e.g., mdi:toggle-switch)")
+
+	helpersCreateButtonCmd.Flags().StringVar(&helperIcon, "icon", "", "Icon (e.g., mdi:button-pointer)")
+
+	helpersCreateNumberCmd.Flags().Float64Var(&helperMin, "min", 0, "Minimum value")
+	helpersCreateNumberCmd.Flags().Float64Var(&helperMax, "max", 100, "Maximum value")
+	helpersCreateNumberCmd.Flags().Float64Var(&helperStep, "step", 1, "Step size")
+	helpersCreateNumberCmd.Flags().StringVar(&helperMode, "mode", "slider", "Mode: slider or box")
+	helpersCreateNumberCmd.Flags().Float64Var(&helperInitial, "initial", 0, "Initial value")
+	helpersCreateNumberCmd.Flags().BoolVar(&helperHasInitial, "set-initial", false, "Set initial value")
+	helpersCreateNumberCmd.Flags().StringVar(&helperIcon, "icon", "", "Icon (e.g., mdi:numeric)")
+
+	helpersCreateTextCmd.Flags().IntVar(&helperTextMin, "min", 0, "Minimum length")
+	helpersCreateTextCmd.Flags().IntVar(&helperTextMax, "max", 100, "Maximum length")
+	helpersCreateTextCmd.Flags().StringVar(&helperMode, "mode", "text", "Mode: text or password")
+	helpersCreateTextCmd.Flags().StringVar(&helperPattern, "pattern", "", "Regex pattern for validation")
+	helpersCreateTextCmd.Flags().StringVar(&helperIcon, "icon", "", "Icon (e.g., mdi:text)")
 
 	helpersEditSelectCmd.Flags().StringVar(&helperOptions, "options", "", "JSON array of options")
 
@@ -284,6 +370,120 @@ func runHelpersCreateSelect(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Input select created: %s\n", helper.Name)
 	fmt.Printf("Entity ID: input_select.%s\n", helper.ID)
 	fmt.Printf("\nNote: You may need to reload input_select or restart Home Assistant for the new helper to appear.\n")
+
+	return nil
+}
+
+func runHelpersCreateBoolean(cmd *cobra.Command, args []string) error {
+	name := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	wsClient, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect to Home Assistant: %w", err)
+	}
+	defer wsClient.Close()
+
+	helper, err := wsClient.CreateInputBoolean(name, helperIcon)
+	if err != nil {
+		return fmt.Errorf("failed to create input_boolean: %w", err)
+	}
+
+	fmt.Printf("Input boolean created: %s\n", helper.Name)
+	fmt.Printf("Entity ID: input_boolean.%s\n", helper.ID)
+	fmt.Printf("\nNote: You may need to reload input_boolean or restart Home Assistant for the new helper to appear.\n")
+
+	return nil
+}
+
+func runHelpersCreateButton(cmd *cobra.Command, args []string) error {
+	name := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	wsClient, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect to Home Assistant: %w", err)
+	}
+	defer wsClient.Close()
+
+	helper, err := wsClient.CreateInputButton(name, helperIcon)
+	if err != nil {
+		return fmt.Errorf("failed to create input_button: %w", err)
+	}
+
+	fmt.Printf("Input button created: %s\n", helper.Name)
+	fmt.Printf("Entity ID: input_button.%s\n", helper.ID)
+	fmt.Printf("\nNote: You may need to reload input_button or restart Home Assistant for the new helper to appear.\n")
+
+	return nil
+}
+
+func runHelpersCreateNumber(cmd *cobra.Command, args []string) error {
+	name := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	wsClient, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect to Home Assistant: %w", err)
+	}
+	defer wsClient.Close()
+
+	var initialPtr *float64
+	if helperHasInitial {
+		initialPtr = &helperInitial
+	}
+
+	helper, err := wsClient.CreateInputNumber(name, helperMin, helperMax, helperStep, helperMode, helperIcon, initialPtr)
+	if err != nil {
+		return fmt.Errorf("failed to create input_number: %w", err)
+	}
+
+	fmt.Printf("Input number created: %s\n", helper.Name)
+	fmt.Printf("Entity ID: input_number.%s\n", helper.ID)
+	fmt.Printf("Range: %.2f to %.2f (step: %.2f)\n", helperMin, helperMax, helperStep)
+	fmt.Printf("\nNote: You may need to reload input_number or restart Home Assistant for the new helper to appear.\n")
+
+	return nil
+}
+
+func runHelpersCreateText(cmd *cobra.Command, args []string) error {
+	name := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	wsClient, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect to Home Assistant: %w", err)
+	}
+	defer wsClient.Close()
+
+	helper, err := wsClient.CreateInputText(name, helperTextMin, helperTextMax, helperMode, helperPattern, helperIcon)
+	if err != nil {
+		return fmt.Errorf("failed to create input_text: %w", err)
+	}
+
+	fmt.Printf("Input text created: %s\n", helper.Name)
+	fmt.Printf("Entity ID: input_text.%s\n", helper.ID)
+	fmt.Printf("Length: %d to %d characters\n", helperTextMin, helperTextMax)
+	if helperPattern != "" {
+		fmt.Printf("Pattern: %s\n", helperPattern)
+	}
+	fmt.Printf("\nNote: You may need to reload input_text or restart Home Assistant for the new helper to appear.\n")
 
 	return nil
 }

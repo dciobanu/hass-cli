@@ -176,9 +176,12 @@ hass-cli helpers                        # List all helpers
 hass-cli helpers --json                 # Output as JSON
 hass-cli helpers inspect <helper_id>    # Show helper state and attributes
 
-# Create a dropdown (input_select) helper
-hass-cli helpers create-select "Room Scene" --options '["off","bright","dim","romantic"]'
-hass-cli helpers create-select "My Dropdown" --options '["option1","option2"]' --icon mdi:format-list-bulleted
+# Create helpers (all types supported)
+hass-cli helpers create-select "Room Scene" --options '["off","bright","dim","romantic"]' --icon mdi:lightbulb
+hass-cli helpers create-boolean "Night Mode" --icon mdi:weather-night
+hass-cli helpers create-button "Doorbell" --icon mdi:bell
+hass-cli helpers create-number "Volume" --min 0 --max 100 --step 5 --mode slider --icon mdi:volume-high
+hass-cli helpers create-text "User Name" --min 0 --max 100 --mode text --icon mdi:account
 
 # Edit a dropdown helper (update options)
 hass-cli helpers edit-select input_select.room_scene --options '["off","bright","dim"]'

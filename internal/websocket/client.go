@@ -396,6 +396,111 @@ func (c *Client) CreateInputSelect(name string, options []string, icon string) (
 	return &helper, nil
 }
 
+// CreateInputBoolean creates an input_boolean helper.
+func (c *Client) CreateInputBoolean(name string, icon string) (*HelperItem, error) {
+	payload := map[string]interface{}{
+		"name": name,
+	}
+	if icon != "" {
+		payload["icon"] = icon
+	}
+
+	result, err := c.SendCommand("input_boolean/create", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var helper HelperItem
+	if err := json.Unmarshal(result.Result, &helper); err != nil {
+		return nil, fmt.Errorf("failed to parse helper: %w", err)
+	}
+
+	return &helper, nil
+}
+
+// CreateInputButton creates an input_button helper.
+func (c *Client) CreateInputButton(name string, icon string) (*HelperItem, error) {
+	payload := map[string]interface{}{
+		"name": name,
+	}
+	if icon != "" {
+		payload["icon"] = icon
+	}
+
+	result, err := c.SendCommand("input_button/create", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var helper HelperItem
+	if err := json.Unmarshal(result.Result, &helper); err != nil {
+		return nil, fmt.Errorf("failed to parse helper: %w", err)
+	}
+
+	return &helper, nil
+}
+
+// CreateInputNumber creates an input_number helper.
+func (c *Client) CreateInputNumber(name string, min, max, step float64, mode, icon string, initial *float64) (*HelperItem, error) {
+	payload := map[string]interface{}{
+		"name": name,
+		"min":  min,
+		"max":  max,
+		"step": step,
+	}
+	if mode != "" {
+		payload["mode"] = mode
+	}
+	if icon != "" {
+		payload["icon"] = icon
+	}
+	if initial != nil {
+		payload["initial"] = *initial
+	}
+
+	result, err := c.SendCommand("input_number/create", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var helper HelperItem
+	if err := json.Unmarshal(result.Result, &helper); err != nil {
+		return nil, fmt.Errorf("failed to parse helper: %w", err)
+	}
+
+	return &helper, nil
+}
+
+// CreateInputText creates an input_text helper.
+func (c *Client) CreateInputText(name string, min, max int, mode, pattern, icon string) (*HelperItem, error) {
+	payload := map[string]interface{}{
+		"name": name,
+		"min":  min,
+		"max":  max,
+	}
+	if mode != "" {
+		payload["mode"] = mode
+	}
+	if pattern != "" {
+		payload["pattern"] = pattern
+	}
+	if icon != "" {
+		payload["icon"] = icon
+	}
+
+	result, err := c.SendCommand("input_text/create", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var helper HelperItem
+	if err := json.Unmarshal(result.Result, &helper); err != nil {
+		return nil, fmt.Errorf("failed to parse helper: %w", err)
+	}
+
+	return &helper, nil
+}
+
 type helperCommandInfo struct {
 	command string
 	idField string
