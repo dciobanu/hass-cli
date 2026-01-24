@@ -693,3 +693,80 @@ func (c *Client) DeleteAutomation(automationID string) error {
 
 	return nil
 }
+
+// CreateInputSelect creates a new input_select helper.
+func (c *Client) CreateInputSelect(objectID, name string, options []string, icon string) error {
+	config := map[string]interface{}{
+		"name":    name,
+		"options": options,
+	}
+	if icon != "" {
+		config["icon"] = icon
+	}
+
+	resp, err := c.doRequest("POST", "/api/config/input_select/config/"+objectID, config)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode == 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}
+
+// CallInputSelectSetOptions updates the options of an input_select via service call.
+func (c *Client) CallInputSelectSetOptions(entityID string, options []string) error {
+	data := map[string]interface{}{
+		"entity_id": entityID,
+		"options":   options,
+	}
+
+	_, err := c.CallService("input_select", "set_options", data)
+	return err
+}
+
+// DeleteHelper deletes a helper entity.
+func (c *Client) DeleteHelper(domain, objectID string) error {
+	resp, err := c.doRequest("DELETE", "/api/config/"+domain+"/config/"+objectID, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+
+	if resp.StatusCode == 404 {
+		return ErrNotFound
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
+	return nil
+}

@@ -169,6 +169,32 @@ hass-cli automations debug 1761025981191 --json             # Output as JSON
 hass-cli automations delete 1761025981191
 ```
 
+### Helpers
+
+```bash
+hass-cli helpers                        # List all helpers
+hass-cli helpers --json                 # Output as JSON
+hass-cli helpers inspect <helper_id>    # Show helper state and attributes
+
+# Create a dropdown (input_select) helper
+hass-cli helpers create-select "Room Scene" --options '["off","bright","dim","romantic"]'
+hass-cli helpers create-select "My Dropdown" --options '["option1","option2"]' --icon mdi:format-list-bulleted
+
+# Edit a dropdown helper (update options)
+hass-cli helpers edit-select input_select.room_scene --options '["off","bright","dim"]'
+
+# Rename helpers
+hass-cli helpers rename input_button.door_chime --name "Doorbell"
+hass-cli helpers rename input_button.door_chime --new-id input_button.front_door_button
+
+# Enable/disable helpers
+hass-cli helpers disable input_button.front_door_button
+hass-cli helpers enable input_button.front_door_button
+
+# Delete a helper
+hass-cli helpers delete input_select.my_dropdown
+```
+
 ### State
 
 ```bash

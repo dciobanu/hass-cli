@@ -348,6 +348,83 @@ func (c *Client) EnableDevice(deviceID string) (*Device, error) {
 	})
 }
 
+// UpdateEntity updates an entity in the entity registry.
+func (c *Client) UpdateEntity(entityID string, updates map[string]interface{}) (*Entity, error) {
+	updates["entity_id"] = entityID
+
+	result, err := c.SendCommand("config/entity_registry/update", updates)
+	if err != nil {
+		return nil, err
+	}
+
+	var entity Entity
+	if err := json.Unmarshal(result.Result, &entity); err != nil {
+		return nil, fmt.Errorf("failed to parse entity: %w", err)
+	}
+
+	return &entity, nil
+}
+
+// HelperItem represents the response returned by helper create/list commands.
+type HelperItem struct {
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Icon    string   `json:"icon,omitempty"`
+	Options []string `json:"options,omitempty"`
+}
+
+// CreateInputSelect creates an input_select helper.
+func (c *Client) CreateInputSelect(name string, options []string, icon string) (*HelperItem, error) {
+	payload := map[string]interface{}{
+		"name":    name,
+		"options": options,
+	}
+	if icon != "" {
+		payload["icon"] = icon
+	}
+
+	result, err := c.SendCommand("input_select/create", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var helper HelperItem
+	if err := json.Unmarshal(result.Result, &helper); err != nil {
+		return nil, fmt.Errorf("failed to parse helper: %w", err)
+	}
+
+	return &helper, nil
+}
+
+type helperCommandInfo struct {
+	command string
+	idField string
+}
+
+var helperDeleteCommands = map[string]helperCommandInfo{
+	"input_boolean":  {command: "input_boolean/delete", idField: "input_boolean_id"},
+	"input_button":   {command: "input_button/delete", idField: "input_button_id"},
+	"input_datetime": {command: "input_datetime/delete", idField: "input_datetime_id"},
+	"input_number":   {command: "input_number/delete", idField: "input_number_id"},
+	"input_select":   {command: "input_select/delete", idField: "input_select_id"},
+	"input_text":     {command: "input_text/delete", idField: "input_text_id"},
+}
+
+// DeleteHelper removes a helper entity using the WebSocket API.
+func (c *Client) DeleteHelper(domain, objectID string) error {
+	info, ok := helperDeleteCommands[domain]
+	if !ok {
+		return fmt.Errorf("unsupported helper domain: %s", domain)
+	}
+
+	payload := map[string]interface{}{
+		info.idField: objectID,
+	}
+
+	_, err := c.SendCommand(info.command, payload)
+	return err
+}
+
 // TraceSummary represents a summary of a script/automation trace.
 type TraceSummary struct {
 	LastStep        string         `json:"last_step"`
@@ -367,17 +444,17 @@ type TraceTimestamp struct {
 
 // TraceDetail represents detailed trace information.
 type TraceDetail struct {
-	LastStep        string                   `json:"last_step"`
-	RunID           string                   `json:"run_id"`
-	State           string                   `json:"state"`
-	ScriptExecution string                   `json:"script_execution"`
-	Timestamp       TraceTimestamp           `json:"timestamp"`
-	Domain          string                   `json:"domain"`
-	ItemID          string                   `json:"item_id"`
-	Trace           map[string][]TraceStep   `json:"trace"`
-	Config          map[string]interface{}   `json:"config"`
-	BlueprintInputs map[string]interface{}   `json:"blueprint_inputs,omitempty"`
-	Context         TraceContext             `json:"context"`
+	LastStep        string                 `json:"last_step"`
+	RunID           string                 `json:"run_id"`
+	State           string                 `json:"state"`
+	ScriptExecution string                 `json:"script_execution"`
+	Timestamp       TraceTimestamp         `json:"timestamp"`
+	Domain          string                 `json:"domain"`
+	ItemID          string                 `json:"item_id"`
+	Trace           map[string][]TraceStep `json:"trace"`
+	Config          map[string]interface{} `json:"config"`
+	BlueprintInputs map[string]interface{} `json:"blueprint_inputs,omitempty"`
+	Context         TraceContext           `json:"context"`
 }
 
 // TraceStep represents a single step in a trace.
