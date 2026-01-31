@@ -41,6 +41,21 @@ Examples:
 	RunE: runEntitiesInspect,
 }
 
+var entitiesSetAreaCmd = &cobra.Command{
+	Use:   "set-area <entity_id> <area_id>",
+	Short: "Assign an entity to an area",
+	Long: `Assign an entity to a specific area in Home Assistant.
+
+Use an empty string or "none" to remove the area assignment.
+
+Examples:
+  hass-cli entities set-area scene.living_room_cozy living_room
+  hass-cli entities set-area light.kitchen kitchen
+  hass-cli entities set-area sensor.temp none    # Remove area assignment`,
+	Args: cobra.ExactArgs(2),
+	RunE: runEntitiesSetArea,
+}
+
 var (
 	entityDomain string
 	entityArea   string
@@ -50,6 +65,7 @@ var (
 func init() {
 	rootCmd.AddCommand(entitiesCmd)
 	entitiesCmd.AddCommand(entitiesInspectCmd)
+	entitiesCmd.AddCommand(entitiesSetAreaCmd)
 
 	entitiesCmd.Flags().StringVarP(&entityDomain, "domain", "d", "", "Filter by domain (e.g., light, switch, sensor)")
 	entitiesCmd.Flags().StringVarP(&entityArea, "area", "a", "", "Filter by area name")
@@ -263,4 +279,60 @@ func runEntitiesInspect(cmd *cobra.Command, args []string) error {
 	}
 
 	return outputJSON(state)
+}
+
+func runEntitiesSetArea(cmd *cobra.Command, args []string) error {
+	entityID := args[0]
+	areaID := args[1]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	wsClient, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	defer wsClient.Close()
+
+	// Handle "none" or empty string to clear area assignment
+	updates := make(map[string]interface{})
+	if areaID == "" || strings.ToLower(areaID) == "none" {
+		updates["area_id"] = nil
+	} else {
+		// Validate area exists
+		areas, err := wsClient.GetAreas()
+		if err != nil {
+			return fmt.Errorf("failed to get areas: %w", err)
+		}
+
+		var foundArea *websocket.Area
+		for _, area := range areas {
+			if area.AreaID == areaID || strings.EqualFold(area.Name, areaID) {
+				foundArea = &area
+				break
+			}
+		}
+
+		if foundArea == nil {
+			return fmt.Errorf("area not found: %s", areaID)
+		}
+
+		updates["area_id"] = foundArea.AreaID
+		areaID = foundArea.AreaID // Use the actual ID
+	}
+
+	_, err = wsClient.UpdateEntity(entityID, updates)
+	if err != nil {
+		return fmt.Errorf("failed to set area: %w", err)
+	}
+
+	if areaID == "" || strings.ToLower(args[1]) == "none" {
+		fmt.Printf("Removed area assignment from %s\n", entityID)
+	} else {
+		fmt.Printf("Assigned %s to area: %s\n", entityID, areaID)
+	}
+
+	return nil
 }

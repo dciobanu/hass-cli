@@ -60,6 +60,9 @@ hass-cli entities -a kitchen            # Filter by area
 hass-cli entities -D <device_id>        # Filter by device (prefix match)
 hass-cli entities --json                # Output as JSON
 hass-cli entities inspect <entity_id>   # Show full entity state + attributes
+hass-cli entities set-area <entity_id> <area_id>  # Assign entity to area
+hass-cli entities set-area scene.my_scene living_room
+hass-cli entities set-area light.lamp none        # Remove area assignment
 ```
 
 ### Areas
