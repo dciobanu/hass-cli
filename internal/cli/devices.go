@@ -97,6 +97,21 @@ Examples:
 	RunE: runDevicesEnable,
 }
 
+var devicesRenameCmd = &cobra.Command{
+	Use:   "rename <device_id> <new_name>",
+	Short: "Rename a device",
+	Long: `Rename a device in the Home Assistant device registry.
+
+The device ID can be found by running 'hass-cli devices'.
+You can use a partial ID (prefix match) for convenience.
+
+Examples:
+  hass-cli devices rename 95a3100700e6 "Spare - 2"
+  hass-cli devices rename 95a3 "Living Room Light"`,
+	Args: cobra.ExactArgs(2),
+	RunE: runDevicesRename,
+}
+
 var (
 	deviceManufacturer string
 	deviceArea         string
@@ -108,6 +123,7 @@ func init() {
 	devicesCmd.AddCommand(devicesRemoveCmd)
 	devicesCmd.AddCommand(devicesDisableCmd)
 	devicesCmd.AddCommand(devicesEnableCmd)
+	devicesCmd.AddCommand(devicesRenameCmd)
 
 	devicesCmd.Flags().StringVarP(&deviceManufacturer, "manufacturer", "m", "", "Filter by manufacturer (case-insensitive)")
 	devicesCmd.Flags().StringVarP(&deviceArea, "area", "a", "", "Filter by area ID")
@@ -460,6 +476,67 @@ func setDeviceDisabled(deviceID string, disable bool) error {
 		fmt.Printf("Device enabled: %s (%s)\n", device.ID, device.DisplayName())
 	}
 
+	return nil
+}
+
+func runDevicesRename(cmd *cobra.Command, args []string) error {
+	deviceID := args[0]
+	newName := args[1]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	printInfo("Connecting to Home Assistant...")
+	client, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	defer client.Close()
+
+	printInfo("Fetching devices...")
+	devices, err := client.GetDevices()
+	if err != nil {
+		return fmt.Errorf("failed to get devices: %w", err)
+	}
+
+	// Find device by ID (exact or prefix match)
+	var found *websocket.Device
+	var matches []websocket.Device
+
+	for i := range devices {
+		if devices[i].ID == deviceID {
+			found = &devices[i]
+			break
+		}
+		if strings.HasPrefix(devices[i].ID, deviceID) {
+			matches = append(matches, devices[i])
+		}
+	}
+
+	if found == nil {
+		if len(matches) == 0 {
+			return fmt.Errorf("no device found with ID: %s", deviceID)
+		}
+		if len(matches) > 1 {
+			fmt.Fprintf(os.Stderr, "Multiple devices match '%s':\n", deviceID)
+			for _, d := range matches {
+				fmt.Fprintf(os.Stderr, "  %s  %s\n", d.ID, d.DisplayName())
+			}
+			return fmt.Errorf("please provide a more specific ID")
+		}
+		found = &matches[0]
+	}
+
+	device, err := client.UpdateDevice(found.ID, map[string]interface{}{
+		"name_by_user": newName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to rename device: %w", err)
+	}
+
+	fmt.Printf("Renamed device %s to: %s\n", device.ID, newName)
 	return nil
 }
 

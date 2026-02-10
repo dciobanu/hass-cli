@@ -41,6 +41,18 @@ Examples:
 	RunE: runEntitiesInspect,
 }
 
+var entitiesRenameCmd = &cobra.Command{
+	Use:   "rename <entity_id> <new_name>",
+	Short: "Rename an entity",
+	Long: `Rename an entity in the Home Assistant entity registry.
+
+Examples:
+  hass-cli entities rename light.old_bulb "Spare - 1"
+  hass-cli entities rename sensor.temp "Kitchen Temperature"`,
+	Args: cobra.ExactArgs(2),
+	RunE: runEntitiesRename,
+}
+
 var entitiesSetAreaCmd = &cobra.Command{
 	Use:   "set-area <entity_id> <area_id>",
 	Short: "Assign an entity to an area",
@@ -65,6 +77,7 @@ var (
 func init() {
 	rootCmd.AddCommand(entitiesCmd)
 	entitiesCmd.AddCommand(entitiesInspectCmd)
+	entitiesCmd.AddCommand(entitiesRenameCmd)
 	entitiesCmd.AddCommand(entitiesSetAreaCmd)
 
 	entitiesCmd.Flags().StringVarP(&entityDomain, "domain", "d", "", "Filter by domain (e.g., light, switch, sensor)")
@@ -279,6 +292,34 @@ func runEntitiesInspect(cmd *cobra.Command, args []string) error {
 	}
 
 	return outputJSON(state)
+}
+
+func runEntitiesRename(cmd *cobra.Command, args []string) error {
+	entityID := args[0]
+	newName := args[1]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	wsClient, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	defer wsClient.Close()
+
+	updates := map[string]interface{}{
+		"name": newName,
+	}
+
+	_, err = wsClient.UpdateEntity(entityID, updates)
+	if err != nil {
+		return fmt.Errorf("failed to rename entity: %w", err)
+	}
+
+	fmt.Printf("Renamed %s to: %s\n", entityID, newName)
+	return nil
 }
 
 func runEntitiesSetArea(cmd *cobra.Command, args []string) error {
