@@ -21,7 +21,7 @@ BINDIR := $(PREFIX)/bin
 .PHONY: all build clean test fmt vet lint tidy install uninstall help
 
 # Default target
-all: build
+all: help
 
 # Build the binary
 build:

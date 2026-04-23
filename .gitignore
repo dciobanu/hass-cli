@@ -30,3 +30,4 @@ vendor/
 config.json
 .env
 .direnv
+MyHASS.md
