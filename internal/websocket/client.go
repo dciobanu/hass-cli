@@ -212,6 +212,68 @@ func (c *Client) GetAreas() ([]Area, error) {
 	return areas, nil
 }
 
+// Dashboard represents a Lovelace dashboard registered in Home Assistant.
+type Dashboard struct {
+	ID            string `json:"id"`
+	URLPath       string `json:"url_path"`
+	Title         string `json:"title"`
+	Icon          string `json:"icon,omitempty"`
+	Mode          string `json:"mode,omitempty"`
+	RequireAdmin  bool   `json:"require_admin"`
+	ShowInSidebar bool   `json:"show_in_sidebar"`
+}
+
+// GetDashboards retrieves the list of user-defined Lovelace dashboards.
+// Note: the default "Overview" dashboard is not included in this list.
+func (c *Client) GetDashboards() ([]Dashboard, error) {
+	result, err := c.SendCommand("lovelace/dashboards/list", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var dashboards []Dashboard
+	if err := json.Unmarshal(result.Result, &dashboards); err != nil {
+		return nil, fmt.Errorf("failed to parse dashboards: %w", err)
+	}
+
+	return dashboards, nil
+}
+
+// GetDashboardConfig retrieves the Lovelace configuration for a dashboard.
+// Pass an empty urlPath for the default dashboard.
+func (c *Client) GetDashboardConfig(urlPath string) (map[string]interface{}, error) {
+	payload := map[string]interface{}{}
+	if urlPath != "" {
+		payload["url_path"] = urlPath
+	}
+
+	result, err := c.SendCommand("lovelace/config", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(result.Result, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse dashboard config: %w", err)
+	}
+
+	return config, nil
+}
+
+// SaveDashboardConfig overwrites the Lovelace configuration for a dashboard.
+// Pass an empty urlPath for the default dashboard.
+func (c *Client) SaveDashboardConfig(urlPath string, config map[string]interface{}) error {
+	payload := map[string]interface{}{
+		"config": config,
+	}
+	if urlPath != "" {
+		payload["url_path"] = urlPath
+	}
+
+	_, err := c.SendCommand("lovelace/config/save", payload)
+	return err
+}
+
 // GetEntities retrieves all entities from the entity registry.
 func (c *Client) GetEntities() ([]Entity, error) {
 	result, err := c.SendCommand("config/entity_registry/list", nil)
