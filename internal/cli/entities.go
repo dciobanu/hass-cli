@@ -42,14 +42,18 @@ Examples:
 }
 
 var entitiesRenameCmd = &cobra.Command{
-	Use:   "rename <entity_id> <new_name>",
+	Use:   "rename <entity_id> [new_name]",
 	Short: "Rename an entity",
 	Long: `Rename an entity in the Home Assistant entity registry.
 
+Set the friendly name, the entity_id (--id), or both.
+
 Examples:
   hass-cli entities rename light.old_bulb "Spare - 1"
-  hass-cli entities rename sensor.temp "Kitchen Temperature"`,
-	Args: cobra.ExactArgs(2),
+  hass-cli entities rename sensor.temp "Kitchen Temperature"
+  hass-cli entities rename light.sengled_e11_n1ea --id light.living_room_ceiling_2_1_v2
+  hass-cli entities rename light.sengled_e11_n1ea "Living Room - Ceiling - 2.1 (v2)" --id light.living_room_ceiling_2_1_v2`,
+	Args: cobra.RangeArgs(1, 2),
 	RunE: runEntitiesRename,
 }
 
@@ -72,6 +76,7 @@ var (
 	entityDomain string
 	entityArea   string
 	entityDevice string
+	entityNewID  string
 )
 
 func init() {
@@ -83,6 +88,8 @@ func init() {
 	entitiesCmd.Flags().StringVarP(&entityDomain, "domain", "d", "", "Filter by domain (e.g., light, switch, sensor)")
 	entitiesCmd.Flags().StringVarP(&entityArea, "area", "a", "", "Filter by area name")
 	entitiesCmd.Flags().StringVarP(&entityDevice, "device", "D", "", "Filter by device ID (prefix match supported)")
+
+	entitiesRenameCmd.Flags().StringVar(&entityNewID, "id", "", "New entity_id (changes the entity_id, not just the display name)")
 }
 
 // EntityWithState combines entity registry info with current state.
@@ -296,7 +303,20 @@ func runEntitiesInspect(cmd *cobra.Command, args []string) error {
 
 func runEntitiesRename(cmd *cobra.Command, args []string) error {
 	entityID := args[0]
-	newName := args[1]
+
+	updates := make(map[string]interface{})
+	var newName string
+	if len(args) == 2 {
+		newName = args[1]
+		updates["name"] = newName
+	}
+	if entityNewID != "" {
+		updates["new_entity_id"] = entityNewID
+	}
+
+	if len(updates) == 0 {
+		return fmt.Errorf("nothing to change: provide a new name and/or --id")
+	}
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -309,16 +329,19 @@ func runEntitiesRename(cmd *cobra.Command, args []string) error {
 	}
 	defer wsClient.Close()
 
-	updates := map[string]interface{}{
-		"name": newName,
-	}
-
 	_, err = wsClient.UpdateEntity(entityID, updates)
 	if err != nil {
 		return fmt.Errorf("failed to rename entity: %w", err)
 	}
 
-	fmt.Printf("Renamed %s to: %s\n", entityID, newName)
+	switch {
+	case newName != "" && entityNewID != "":
+		fmt.Printf("Renamed %s to: %s (new entity_id: %s)\n", entityID, newName, entityNewID)
+	case entityNewID != "":
+		fmt.Printf("Changed entity_id %s to: %s\n", entityID, entityNewID)
+	default:
+		fmt.Printf("Renamed %s to: %s\n", entityID, newName)
+	}
 	return nil
 }
 
