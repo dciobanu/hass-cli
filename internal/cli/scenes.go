@@ -95,6 +95,20 @@ Examples:
 	RunE: runScenesRemoveEntity,
 }
 
+var scenesReplaceEntityCmd = &cobra.Command{
+	Use:   "replace-entity <scene_id> <old_entity_id> <new_entity_id>",
+	Short: "Replace an entity in a scene, preserving its stored state",
+	Long: `Replace an entity in an existing scene with another entity, copying the
+old entity's stored state onto the new one. Useful when a device is swapped
+(e.g. a bulb replaced by a different model) and you want the scene to keep
+the same look rather than recapturing the new entity's current state.
+
+Examples:
+  hass-cli scenes replace-entity 1767906424271 light.wiz_old light.sengled_new`,
+	Args: cobra.ExactArgs(3),
+	RunE: runScenesReplaceEntity,
+}
+
 var (
 	sceneEntities []string
 	sceneIcon     string
@@ -107,6 +121,7 @@ func init() {
 	scenesCmd.AddCommand(scenesDeleteCmd)
 	scenesCmd.AddCommand(scenesAddEntityCmd)
 	scenesCmd.AddCommand(scenesRemoveEntityCmd)
+	scenesCmd.AddCommand(scenesReplaceEntityCmd)
 
 	scenesCreateCmd.Flags().StringArrayVarP(&sceneEntities, "entity", "e", []string{}, "Entity to include in scene (can be specified multiple times)")
 	scenesCreateCmd.Flags().StringVar(&sceneIcon, "icon", "", "Icon for the scene (e.g., mdi:movie)")
@@ -420,6 +435,60 @@ func runScenesRemoveEntity(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Removed %s from scene %s\n", entityID, config.Name)
+
+	return nil
+}
+
+func runScenesReplaceEntity(cmd *cobra.Command, args []string) error {
+	sceneID := args[0]
+	oldEntityID := args[1]
+	newEntityID := args[2]
+
+	if oldEntityID == newEntityID {
+		return fmt.Errorf("old and new entity IDs are identical")
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	client := api.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+
+	printInfo("Fetching scene configuration...")
+	config, err := client.GetSceneConfig(sceneID)
+	if err != nil {
+		return fmt.Errorf("failed to get scene: %w", err)
+	}
+
+	oldState, exists := config.Entities[oldEntityID]
+	if !exists {
+		return fmt.Errorf("entity %s not found in scene", oldEntityID)
+	}
+	if _, exists := config.Entities[newEntityID]; exists {
+		return fmt.Errorf("entity %s already exists in scene", newEntityID)
+	}
+
+	// Copy the old entity's stored state, dropping cosmetic/identity
+	// attributes that should not be carried to a different entity.
+	newState := make(map[string]interface{})
+	for k, v := range oldState {
+		switch k {
+		case "friendly_name", "icon", "entity_id", "supported_features", "device_class":
+			continue
+		}
+		newState[k] = v
+	}
+
+	config.Entities[newEntityID] = newState
+	delete(config.Entities, oldEntityID)
+
+	printInfo("Updating scene...")
+	if err := client.UpdateScene(sceneID, config); err != nil {
+		return fmt.Errorf("failed to update scene: %w", err)
+	}
+
+	fmt.Printf("Replaced %s with %s in scene %s\n", oldEntityID, newEntityID, config.Name)
 
 	return nil
 }
