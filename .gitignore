@@ -31,3 +31,6 @@ config.json
 .env
 .direnv
 MyHASS.md
+
+# Local Claude Code settings and skills
+.claude/
