@@ -174,12 +174,12 @@ func init() {
 
 // ScriptInfo combines script entity info with config details.
 type ScriptInfo struct {
-	EntityID    string `json:"entity_id"`
-	Name        string `json:"name"`
-	State       string `json:"state"`
-	Icon        string `json:"icon,omitempty"`
-	Mode        string `json:"mode,omitempty"`
-	Description string `json:"description,omitempty"`
+	EntityID      string `json:"entity_id"`
+	Name          string `json:"name"`
+	State         string `json:"state"`
+	Icon          string `json:"icon,omitempty"`
+	Mode          string `json:"mode,omitempty"`
+	Description   string `json:"description,omitempty"`
 	LastTriggered string `json:"last_triggered,omitempty"`
 }
 

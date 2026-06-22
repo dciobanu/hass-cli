@@ -57,13 +57,13 @@ type AreaWithCounts struct {
 
 // AreaDetail includes full area info with devices and entities.
 type AreaDetail struct {
-	AreaID   string           `json:"area_id"`
-	Name     string           `json:"name"`
-	FloorID  *string          `json:"floor_id"`
-	Icon     *string          `json:"icon"`
-	Aliases  []string         `json:"aliases"`
-	Devices  []DeviceSummary  `json:"devices"`
-	Entities []EntitySummary  `json:"entities"`
+	AreaID   string          `json:"area_id"`
+	Name     string          `json:"name"`
+	FloorID  *string         `json:"floor_id"`
+	Icon     *string         `json:"icon"`
+	Aliases  []string        `json:"aliases"`
+	Devices  []DeviceSummary `json:"devices"`
+	Entities []EntitySummary `json:"entities"`
 }
 
 // DeviceSummary is a brief device representation.

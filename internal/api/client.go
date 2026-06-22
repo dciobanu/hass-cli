@@ -286,11 +286,11 @@ type Service struct {
 
 // ServiceInfo represents information about a service.
 type ServiceInfo struct {
-	Name        string                    `json:"name"`
-	Description string                    `json:"description"`
-	Fields      map[string]ServiceField   `json:"fields"`
-	Target      *ServiceTarget            `json:"target"`
-	Response    *ServiceResponseInfo      `json:"response,omitempty"`
+	Name        string                  `json:"name"`
+	Description string                  `json:"description"`
+	Fields      map[string]ServiceField `json:"fields"`
+	Target      *ServiceTarget          `json:"target"`
+	Response    *ServiceResponseInfo    `json:"response,omitempty"`
 }
 
 // ServiceField represents a field in a service.
@@ -349,8 +349,8 @@ func (c *Client) GetServices() (map[string]map[string]ServiceInfo, error) {
 
 	// API returns array of {domain, services} objects
 	var services []struct {
-		Domain   string                     `json:"domain"`
-		Services map[string]ServiceInfo     `json:"services"`
+		Domain   string                 `json:"domain"`
+		Services map[string]ServiceInfo `json:"services"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&services); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
@@ -493,6 +493,60 @@ func (c *Client) DeleteScene(sceneID string) error {
 		}
 	}
 
+	return nil
+}
+
+// ConfigEntry represents an integration config entry.
+type ConfigEntry struct {
+	EntryID string `json:"entry_id"`
+	Domain  string `json:"domain"`
+	Title   string `json:"title"`
+	State   string `json:"state,omitempty"`
+}
+
+// ListConfigEntries retrieves all integration config entries.
+func (c *Client) ListConfigEntries() ([]ConfigEntry, error) {
+	resp, err := c.doRequest("GET", "/api/config/config_entries/entry", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, ErrUnauthorized
+	}
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &APIError{StatusCode: resp.StatusCode, Message: string(body)}
+	}
+
+	var entries []ConfigEntry
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return entries, nil
+}
+
+// RemoveConfigEntry deletes an integration config entry. For integrations
+// where each device is its own config entry (e.g. WiZ), this deletes the
+// device and its entities.
+func (c *Client) RemoveConfigEntry(entryID string) error {
+	resp, err := c.doRequest("DELETE", "/api/config/config_entries/entry/"+entryID, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return ErrUnauthorized
+	}
+	if resp.StatusCode == 404 {
+		return ErrNotFound
+	}
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{StatusCode: resp.StatusCode, Message: string(body)}
+	}
 	return nil
 }
 

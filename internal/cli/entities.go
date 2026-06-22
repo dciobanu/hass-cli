@@ -72,11 +72,35 @@ Examples:
 	RunE: runEntitiesSetArea,
 }
 
+var entitiesReslugCmd = &cobra.Command{
+	Use:   "reslug <device_id>",
+	Short: "Align a device's entity_ids to its (renamed) device name",
+	Long: `Rewrite the entity_ids of a device's entities so their object_id base
+matches the device name. Renaming a device only changes friendly names; the
+entity_ids keep their original slug. This fixes that in one shot.
+
+The old base is auto-detected from the device's primary light entity (or
+override with --from). The new base defaults to a slug of the device name
+(override with --to). Entities whose object_id does not start with the old
+base (e.g. generic signal sensors) are left untouched.
+
+Examples:
+  hass-cli entities reslug 70113ea4                                  # -> slug of device name
+  hass-cli entities reslug bd8ae90d --to living_room_ceiling_1_4_v2
+  hass-cli entities reslug bd8ae90d --from living_room_ceiling_1_4 --to living_room_ceiling_1_4_v2
+  hass-cli entities reslug bd8ae90d --dry-run`,
+	Args: cobra.ExactArgs(1),
+	RunE: runEntitiesReslug,
+}
+
 var (
 	entityDomain string
 	entityArea   string
 	entityDevice string
 	entityNewID  string
+	reslugFrom   string
+	reslugTo     string
+	reslugDryRun bool
 )
 
 func init() {
@@ -84,12 +108,32 @@ func init() {
 	entitiesCmd.AddCommand(entitiesInspectCmd)
 	entitiesCmd.AddCommand(entitiesRenameCmd)
 	entitiesCmd.AddCommand(entitiesSetAreaCmd)
+	entitiesCmd.AddCommand(entitiesReslugCmd)
 
 	entitiesCmd.Flags().StringVarP(&entityDomain, "domain", "d", "", "Filter by domain (e.g., light, switch, sensor)")
 	entitiesCmd.Flags().StringVarP(&entityArea, "area", "a", "", "Filter by area name")
 	entitiesCmd.Flags().StringVarP(&entityDevice, "device", "D", "", "Filter by device ID (prefix match supported)")
 
 	entitiesRenameCmd.Flags().StringVar(&entityNewID, "id", "", "New entity_id (changes the entity_id, not just the display name)")
+
+	entitiesReslugCmd.Flags().StringVar(&reslugFrom, "from", "", "Old object_id base to replace (default: auto-detect from the device's light entity)")
+	entitiesReslugCmd.Flags().StringVar(&reslugTo, "to", "", "New object_id base (default: slug of the device name)")
+	entitiesReslugCmd.Flags().BoolVar(&reslugDryRun, "dry-run", false, "Show what would change without renaming")
+}
+
+// reslugEntityID returns the new entity_id obtained by replacing a leading
+// oldBase in the object_id with newBase. The second return is false when the
+// object_id does not start with oldBase (so the entity should be left alone).
+func reslugEntityID(entityID, oldBase, newBase string) (string, bool) {
+	dot := strings.IndexByte(entityID, '.')
+	if dot < 0 {
+		return entityID, false
+	}
+	domain, object := entityID[:dot], entityID[dot+1:]
+	if object != oldBase && !strings.HasPrefix(object, oldBase+"_") {
+		return entityID, false
+	}
+	return domain + "." + newBase + object[len(oldBase):], true
 }
 
 // EntityWithState combines entity registry info with current state.
@@ -342,6 +386,100 @@ func runEntitiesRename(cmd *cobra.Command, args []string) error {
 	default:
 		fmt.Printf("Renamed %s to: %s\n", entityID, newName)
 	}
+	return nil
+}
+
+func runEntitiesReslug(cmd *cobra.Command, args []string) error {
+	deviceID := args[0]
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	wsClient, err := websocket.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	defer wsClient.Close()
+
+	devices, err := wsClient.GetDevices()
+	if err != nil {
+		return fmt.Errorf("failed to get devices: %w", err)
+	}
+	var device *websocket.Device
+	for i := range devices {
+		if devices[i].ID == deviceID || strings.HasPrefix(devices[i].ID, deviceID) {
+			device = &devices[i]
+			break
+		}
+	}
+	if device == nil {
+		return fmt.Errorf("no device found with ID: %s", deviceID)
+	}
+
+	entities, err := wsClient.GetEntities()
+	if err != nil {
+		return fmt.Errorf("failed to get entities: %w", err)
+	}
+	var deviceEntities []websocket.Entity
+	for _, e := range entities {
+		if e.DeviceID != nil && *e.DeviceID == device.ID {
+			deviceEntities = append(deviceEntities, e)
+		}
+	}
+	if len(deviceEntities) == 0 {
+		return fmt.Errorf("device %s has no entities", device.ID)
+	}
+
+	// Determine the old base: explicit --from, else the object_id of the
+	// device's primary light entity.
+	oldBase := reslugFrom
+	if oldBase == "" {
+		for _, e := range deviceEntities {
+			if strings.HasPrefix(e.EntityID, "light.") {
+				oldBase = strings.TrimPrefix(e.EntityID, "light.")
+				break
+			}
+		}
+		if oldBase == "" {
+			return fmt.Errorf("could not auto-detect the old base (no light entity); pass --from")
+		}
+	}
+
+	newBase := reslugTo
+	if newBase == "" {
+		newBase = slugify(device.DisplayName())
+	}
+	if newBase == oldBase {
+		fmt.Printf("Nothing to do: base already %q\n", newBase)
+		return nil
+	}
+
+	renamed, skipped := 0, 0
+	for _, e := range deviceEntities {
+		newID, ok := reslugEntityID(e.EntityID, oldBase, newBase)
+		if !ok {
+			skipped++
+			continue
+		}
+		if reslugDryRun {
+			fmt.Printf("  [dry-run] %s -> %s\n", e.EntityID, newID)
+			renamed++
+			continue
+		}
+		if _, err := wsClient.UpdateEntity(e.EntityID, map[string]interface{}{"new_entity_id": newID}); err != nil {
+			fmt.Printf("  ERROR %s: %v\n", e.EntityID, err)
+			continue
+		}
+		fmt.Printf("  %s -> %s\n", e.EntityID, newID)
+		renamed++
+	}
+
+	verb := "renamed"
+	if reslugDryRun {
+		verb = "would rename"
+	}
+	fmt.Printf("\n%s %d entit(y/ies) (%s -> %s); %d left unchanged\n", verb, renamed, oldBase, newBase, skipped)
 	return nil
 }
 

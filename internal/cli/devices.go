@@ -9,6 +9,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/dorinclisu/hass-cli/internal/api"
 	"github.com/dorinclisu/hass-cli/internal/config"
 	"github.com/dorinclisu/hass-cli/internal/websocket"
 	"github.com/spf13/cobra"
@@ -387,16 +388,38 @@ func runDevicesRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("device has no config entries - it may already be orphaned or managed differently")
 	}
 
+	// Count how many devices each config entry is attached to, so the
+	// fallback below only deletes an entry when this is its only device.
+	entryDeviceCount := make(map[string]int)
+	for i := range devices {
+		for _, ce := range devices[i].ConfigEntries {
+			entryDeviceCount[ce]++
+		}
+	}
+
 	// Remove all config entries from the device
 	printInfo("Removing device %s (%s)...", found.ID, found.DisplayName())
 	for _, configEntryID := range found.ConfigEntries {
 		printInfo("  Removing config entry %s...", configEntryID)
-		if err := client.RemoveConfigEntryFromDevice(found.ID, configEntryID); err != nil {
-			errStr := err.Error()
-			if strings.Contains(errStr, "does not support device removal") {
-				return fmt.Errorf("integration does not support device removal via API - use the Home Assistant UI or remove the integration")
-			}
+		err := client.RemoveConfigEntryFromDevice(found.ID, configEntryID)
+		if err == nil {
+			continue
+		}
+		if !strings.Contains(err.Error(), "does not support device removal") {
 			return fmt.Errorf("failed to remove config entry %s: %w", configEntryID, err)
+		}
+
+		// Fallback: the integration won't unlink the device, but if this
+		// device is the only one on the config entry, deleting the entry
+		// removes exactly this device (e.g. WiZ: one entry per bulb).
+		if entryDeviceCount[configEntryID] > 1 {
+			return fmt.Errorf("integration does not support device removal via API, and config entry %s is shared by %d devices - use the Home Assistant UI",
+				configEntryID, entryDeviceCount[configEntryID])
+		}
+		printInfo("  Integration blocks device removal; deleting its config entry instead...")
+		restClient := api.NewClient(cfg.Server.URL, cfg.Server.Token, time.Duration(timeout)*time.Second)
+		if err := restClient.RemoveConfigEntry(configEntryID); err != nil {
+			return fmt.Errorf("failed to delete config entry %s: %w", configEntryID, err)
 		}
 	}
 

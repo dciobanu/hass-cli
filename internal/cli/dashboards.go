@@ -205,6 +205,24 @@ func runDashboardsReplaceEntity(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// replaceDashboardEntity swaps oldEntityID for newEntityID throughout a
+// dashboard config and saves it, returning the number of occurrences replaced.
+func replaceDashboardEntity(wsClient *websocket.Client, urlPath, oldEntityID, newEntityID string) (int, error) {
+	config, err := wsClient.GetDashboardConfig(urlPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get dashboard: %w", err)
+	}
+	count := 0
+	replaced := replaceEntityRefs(config, oldEntityID, newEntityID, &count)
+	if count == 0 {
+		return 0, nil
+	}
+	if err := wsClient.SaveDashboardConfig(urlPath, replaced.(map[string]interface{})); err != nil {
+		return 0, fmt.Errorf("failed to save dashboard: %w", err)
+	}
+	return count, nil
+}
+
 // isEntityID reports whether s looks like a Home Assistant entity_id
 // (domain.object_id).
 func isEntityID(s string) bool {

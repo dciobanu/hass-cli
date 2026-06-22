@@ -461,6 +461,24 @@ func runScenesReplaceEntity(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get scene: %w", err)
 	}
 
+	if err := replaceSceneEntityInConfig(config, oldEntityID, newEntityID); err != nil {
+		return err
+	}
+
+	printInfo("Updating scene...")
+	if err := client.UpdateScene(sceneID, config); err != nil {
+		return fmt.Errorf("failed to update scene: %w", err)
+	}
+
+	fmt.Printf("Replaced %s with %s in scene %s\n", oldEntityID, newEntityID, config.Name)
+
+	return nil
+}
+
+// replaceSceneEntityInConfig swaps oldEntityID for newEntityID in a scene
+// config, copying the old entity's stored state onto the new one and dropping
+// cosmetic/identity attributes that should not carry to a different entity.
+func replaceSceneEntityInConfig(config *api.SceneConfig, oldEntityID, newEntityID string) error {
 	oldState, exists := config.Entities[oldEntityID]
 	if !exists {
 		return fmt.Errorf("entity %s not found in scene", oldEntityID)
@@ -469,8 +487,6 @@ func runScenesReplaceEntity(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("entity %s already exists in scene", newEntityID)
 	}
 
-	// Copy the old entity's stored state, dropping cosmetic/identity
-	// attributes that should not be carried to a different entity.
 	newState := make(map[string]interface{})
 	for k, v := range oldState {
 		switch k {
@@ -482,14 +498,6 @@ func runScenesReplaceEntity(cmd *cobra.Command, args []string) error {
 
 	config.Entities[newEntityID] = newState
 	delete(config.Entities, oldEntityID)
-
-	printInfo("Updating scene...")
-	if err := client.UpdateScene(sceneID, config); err != nil {
-		return fmt.Errorf("failed to update scene: %w", err)
-	}
-
-	fmt.Printf("Replaced %s with %s in scene %s\n", oldEntityID, newEntityID, config.Name)
-
 	return nil
 }
 
