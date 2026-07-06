@@ -35,3 +35,4 @@ MyHASS.md
 # Local Claude Code settings and skills
 .claude/
 /.agents
+/scripts
