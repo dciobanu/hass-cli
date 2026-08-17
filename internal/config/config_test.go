@@ -1,10 +1,138 @@
 package config
 
 import (
+	"errors"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestResolveConfigPath(t *testing.T) {
+	t.Run("flag wins over everything", func(t *testing.T) {
+		t.Setenv(EnvConfigPath, "/env/config.yaml")
+		t.Setenv("XDG_CONFIG_HOME", "/xdg")
+		t.Setenv("HOME", "/home/user")
+
+		got, err := ResolveConfigPath("/flag/config.yaml")
+		if err != nil {
+			t.Fatalf("ResolveConfigPath() error = %v", err)
+		}
+		if got != "/flag/config.yaml" {
+			t.Errorf("path = %q, want %q", got, "/flag/config.yaml")
+		}
+	})
+
+	t.Run("HASS_CLI_CONFIG wins over XDG and HOME", func(t *testing.T) {
+		t.Setenv(EnvConfigPath, "/env/config.yaml")
+		t.Setenv("XDG_CONFIG_HOME", "/xdg")
+		t.Setenv("HOME", "/home/user")
+
+		got, err := ResolveConfigPath("")
+		if err != nil {
+			t.Fatalf("ResolveConfigPath() error = %v", err)
+		}
+		if got != "/env/config.yaml" {
+			t.Errorf("path = %q, want %q", got, "/env/config.yaml")
+		}
+	})
+
+	t.Run("XDG_CONFIG_HOME wins over HOME", func(t *testing.T) {
+		t.Setenv(EnvConfigPath, "")
+		t.Setenv("XDG_CONFIG_HOME", "/xdg")
+		t.Setenv("HOME", "/home/user")
+
+		got, err := ResolveConfigPath("")
+		if err != nil {
+			t.Fatalf("ResolveConfigPath() error = %v", err)
+		}
+		want := filepath.Join("/xdg", "hass-cli", "config.yaml")
+		if got != want {
+			t.Errorf("path = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("falls back to HOME", func(t *testing.T) {
+		t.Setenv(EnvConfigPath, "")
+		t.Setenv("XDG_CONFIG_HOME", "")
+		t.Setenv("HOME", "/home/user")
+
+		got, err := ResolveConfigPath("")
+		if err != nil {
+			t.Fatalf("ResolveConfigPath() error = %v", err)
+		}
+		want := filepath.Join("/home/user", ".config", "hass-cli", "config.yaml")
+		if got != want {
+			t.Errorf("path = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("falls back to passwd entry when HOME is unset", func(t *testing.T) {
+		t.Setenv(EnvConfigPath, "")
+		t.Setenv("XDG_CONFIG_HOME", "")
+		t.Setenv("HOME", "") // registers restoration of HOME after the test
+		os.Unsetenv("HOME")
+
+		got, err := ResolveConfigPath("")
+		u, userErr := user.Current()
+		if userErr != nil || u.HomeDir == "" {
+			// No passwd entry available: resolution must fail loudly.
+			if err == nil {
+				t.Fatalf("ResolveConfigPath() = %q, want error when home is unresolvable", got)
+			}
+			return
+		}
+		if err != nil {
+			t.Fatalf("ResolveConfigPath() error = %v", err)
+		}
+		want := filepath.Join(u.HomeDir, ".config", "hass-cli", "config.yaml")
+		if got != want {
+			t.Errorf("path = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestLoadUsesResolvedPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	os.WriteFile(path, []byte("server:\n  url: http://ha\n  token: tok\n"), 0600)
+
+	t.Setenv(EnvConfigPath, path)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Server.URL != "http://ha" {
+		t.Errorf("URL = %q, want %q", cfg.Server.URL, "http://ha")
+	}
+}
+
+func TestNotConfiguredErrorMentionsPath(t *testing.T) {
+	t.Run("names the path it looked at", func(t *testing.T) {
+		_, err := LoadFrom("/nonexistent/path/config.yaml")
+		if !errors.Is(err, ErrNotConfigured) {
+			t.Fatalf("LoadFrom() error = %v, want ErrNotConfigured", err)
+		}
+		msg := err.Error()
+		for _, want := range []string{"/nonexistent/path/config.yaml", "--config", EnvConfigPath} {
+			if !strings.Contains(msg, want) {
+				t.Errorf("error %q does not mention %q", msg, want)
+			}
+		}
+	})
+
+	t.Run("explains an unresolvable home", func(t *testing.T) {
+		err := &NotConfiguredError{Reason: "could not determine home directory: $HOME is not defined"}
+		if !errors.Is(err, ErrNotConfigured) {
+			t.Errorf("errors.Is(err, ErrNotConfigured) = false, want true")
+		}
+		if !strings.Contains(err.Error(), "could not determine home directory") {
+			t.Errorf("error %q does not explain the home failure", err.Error())
+		}
+	})
+}
 
 func TestLoadFrom(t *testing.T) {
 	t.Run("loads valid config", func(t *testing.T) {
@@ -62,7 +190,7 @@ server:
 
 	t.Run("returns ErrNotConfigured for missing file", func(t *testing.T) {
 		_, err := LoadFrom("/nonexistent/path/config.yaml")
-		if err != ErrNotConfigured {
+		if !errors.Is(err, ErrNotConfigured) {
 			t.Errorf("LoadFrom() error = %v, want ErrNotConfigured", err)
 		}
 	})

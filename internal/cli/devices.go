@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -576,7 +577,7 @@ func loadConfig() (*config.Config, error) {
 	}
 
 	// If config doesn't exist but URL and token are provided via flags, create a temporary config
-	if err == config.ErrNotConfigured && serverURL != "" && token != "" {
+	if errors.Is(err, config.ErrNotConfigured) && serverURL != "" && token != "" {
 		cfg = &config.Config{
 			Server: config.ServerConfig{
 				URL:   serverURL,

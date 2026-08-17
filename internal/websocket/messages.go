@@ -56,27 +56,27 @@ type CommandMessage struct {
 
 // Device represents a device from the device registry.
 type Device struct {
-	ID                 string              `json:"id"`
-	AreaID             *string             `json:"area_id"`
-	ConfigEntries      []string            `json:"config_entries"`
-	Connections        [][]string          `json:"connections"`
-	CreatedAt          float64             `json:"created_at"`
-	DisabledBy         *string             `json:"disabled_by"`
-	EntryType          *string             `json:"entry_type"`
-	HWVersion          *string             `json:"hw_version"`
-	Identifiers        [][]string          `json:"identifiers"`
-	Labels             []string            `json:"labels"`
-	Manufacturer       *string             `json:"manufacturer"`
-	Model              *string             `json:"model"`
-	ModelID            *string             `json:"model_id"`
-	Name               *string             `json:"name"`
-	NameByUser         *string             `json:"name_by_user"`
-	PrimaryConfigEntry *string             `json:"primary_config_entry"`
-	SerialNumber       *string             `json:"serial_number"`
-	SWVersion          *string             `json:"sw_version"`
-	ViaDeviceID        *string             `json:"via_device_id"`
-	ConfigurationURL   *string             `json:"configuration_url"`
-	ModifiedAt         float64             `json:"modified_at"`
+	ID                 string     `json:"id"`
+	AreaID             *string    `json:"area_id"`
+	ConfigEntries      []string   `json:"config_entries"`
+	Connections        [][]string `json:"connections"`
+	CreatedAt          float64    `json:"created_at"`
+	DisabledBy         *string    `json:"disabled_by"`
+	EntryType          *string    `json:"entry_type"`
+	HWVersion          *string    `json:"hw_version"`
+	Identifiers        [][]string `json:"identifiers"`
+	Labels             []string   `json:"labels"`
+	Manufacturer       *string    `json:"manufacturer"`
+	Model              *string    `json:"model"`
+	ModelID            *string    `json:"model_id"`
+	Name               *string    `json:"name"`
+	NameByUser         *string    `json:"name_by_user"`
+	PrimaryConfigEntry *string    `json:"primary_config_entry"`
+	SerialNumber       *string    `json:"serial_number"`
+	SWVersion          *string    `json:"sw_version"`
+	ViaDeviceID        *string    `json:"via_device_id"`
+	ConfigurationURL   *string    `json:"configuration_url"`
+	ModifiedAt         float64    `json:"modified_at"`
 }
 
 // DisplayName returns the best available name for the device.
@@ -108,13 +108,13 @@ func (d *Device) DisplayModel() string {
 
 // Area represents an area from the area registry.
 type Area struct {
-	AreaID   string   `json:"area_id"`
-	Name     string   `json:"name"`
-	Aliases  []string `json:"aliases"`
-	FloorID  *string  `json:"floor_id"`
-	Icon     *string  `json:"icon"`
-	Labels   []string `json:"labels"`
-	Picture  *string  `json:"picture"`
+	AreaID  string   `json:"area_id"`
+	Name    string   `json:"name"`
+	Aliases []string `json:"aliases"`
+	FloorID *string  `json:"floor_id"`
+	Icon    *string  `json:"icon"`
+	Labels  []string `json:"labels"`
+	Picture *string  `json:"picture"`
 }
 
 // Entity represents an entity from the entity registry.
@@ -159,18 +159,18 @@ func (e *Entity) GetOriginalName() *string {
 
 // EventMessage represents an event message from a subscription.
 type EventMessage struct {
-	ID    int        `json:"id"`
-	Type  string     `json:"type"`
-	Event EventData  `json:"event"`
+	ID    int       `json:"id"`
+	Type  string    `json:"type"`
+	Event EventData `json:"event"`
 }
 
 // EventData contains the event payload.
 type EventData struct {
-	EventType  string                 `json:"event_type"`
-	Data       StateChangedData       `json:"data"`
-	Origin     string                 `json:"origin"`
-	TimeFired  string                 `json:"time_fired"`
-	Context    EventContext           `json:"context"`
+	EventType string           `json:"event_type"`
+	Data      StateChangedData `json:"data"`
+	Origin    string           `json:"origin"`
+	TimeFired string           `json:"time_fired"`
+	Context   EventContext     `json:"context"`
 }
 
 // StateChangedData contains state change information.

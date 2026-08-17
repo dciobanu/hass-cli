@@ -31,6 +31,22 @@ hass-cli login --url http://ha:8123 --token TOKEN  # Non-interactive
 hass-cli logout                         # Remove saved credentials
 ```
 
+Credentials live in a config file. The path is resolved in this order:
+
+1. `--config <path>` (or `-c`)
+2. `$HASS_CLI_CONFIG` — full path to the config file
+3. `$XDG_CONFIG_HOME/hass-cli/config.yaml`
+4. `~/.config/hass-cli/config.yaml`
+
+`HASS_CLI_CONFIG` is useful in containers and service managers where `HOME` may
+be unset or point somewhere unexpected:
+
+```bash
+export HASS_CLI_CONFIG=/opt/data/.config/hass-cli/config.yaml
+```
+
+If no config is found, the error names the exact path that was checked.
+
 ### Status
 
 ```bash
@@ -257,6 +273,7 @@ hass-cli watch --json                   # Output as JSON
 
 ```bash
 --json, -j          # Output in JSON format
+--config, -c <path> # Path to config file (overrides $HASS_CLI_CONFIG)
 --url <url>         # Override server URL
 --token <token>     # Override access token
 --timeout <secs>    # Request timeout (default: 30)
@@ -265,7 +282,10 @@ hass-cli watch --json                   # Output as JSON
 
 ## Configuration
 
-Credentials are stored in `~/.config/hass-cli/config.yaml`
+Credentials are stored in `~/.config/hass-cli/config.yaml` by default. Override
+the location with `--config` or the `HASS_CLI_CONFIG` environment variable;
+`XDG_CONFIG_HOME` is honored as well. See [Authentication](#authentication) for
+the full resolution order.
 
 ## Development
 

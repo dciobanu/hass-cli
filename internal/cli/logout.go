@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dorinclisu/hass-cli/internal/config"
@@ -25,15 +26,15 @@ func init() {
 }
 
 func runLogout(cmd *cobra.Command, args []string) error {
-	cfgPath := configPath
-	if cfgPath == "" {
-		cfgPath = config.DefaultConfigPath()
+	cfgPath, err := config.ResolveConfigPath(configPath)
+	if err != nil {
+		return err
 	}
 
 	// Check if config exists
-	_, err := config.LoadFrom(cfgPath)
+	_, err = config.LoadFrom(cfgPath)
 	if err != nil {
-		if err == config.ErrNotConfigured {
+		if errors.Is(err, config.ErrNotConfigured) {
 			printSuccess("Already logged out (no configuration found)")
 			return nil
 		}

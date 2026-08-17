@@ -49,7 +49,7 @@ func SetVersion(v string) {
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().BoolVarP(&jsonOutput, "json", "j", false, "Output in JSON format")
-	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to config file (default: ~/.config/hass-cli/config.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to config file (default: $HASS_CLI_CONFIG, else $XDG_CONFIG_HOME/hass-cli/config.yaml, else ~/.config/hass-cli/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&serverURL, "url", "", "Home Assistant server URL (overrides config)")
 	rootCmd.PersistentFlags().StringVar(&token, "token", "", "Access token (overrides config)")
 	rootCmd.PersistentFlags().IntVar(&timeout, "timeout", 30, "Request timeout in seconds")

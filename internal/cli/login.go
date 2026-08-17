@@ -97,9 +97,9 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		},
 	}
 
-	cfgPath := configPath
-	if cfgPath == "" {
-		cfgPath = config.DefaultConfigPath()
+	cfgPath, err := config.ResolveConfigPath(configPath)
+	if err != nil {
+		return err
 	}
 
 	if err := cfg.SaveTo(cfgPath); err != nil {
